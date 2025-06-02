@@ -1,4 +1,3 @@
-
 import os
 import io
 import random
@@ -18,6 +17,7 @@ drive_service = build('drive', 'v3', credentials=credentials)
 TEMP_LOCAL_DIR = "audio_temp"
 
 def get_folder_id(folder_name, parent_id=None):
+    """جلب ID لمجلد باسم معين (اختياريًا داخل مجلد أب)"""
     query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder'"
     if parent_id:
         query += f" and '{parent_id}' in parents"
@@ -26,21 +26,31 @@ def get_folder_id(folder_name, parent_id=None):
     return folders[0]['id'] if folders else None
 
 def download_first_audio(category):
+    """تحميل أول ملف mp3 من Google Drive داخل audio/{category}/"""
+    # مجلد الجذر AutoUploader > audio > category
     root_id = get_folder_id("AutoUploader")
-    audio_id = get_folder_id("audio", parent_id=root_id)
-    category_id = get_folder_id(category, parent_id=audio_id)
+    if not root_id:
+        print("❌ لم يتم العثور على مجلد AutoUploader")
+        return None
 
+    audio_id = get_folder_id("audio", parent_id=root_id)
+    if not audio_id:
+        print("❌ لم يتم العثور على مجلد audio داخل AutoUploader")
+        return None
+
+    category_id = get_folder_id(category, parent_id=audio_id)
     if not category_id:
         print(f"❌ لم يتم العثور على مجلد: {category}")
-        return
+        return None
 
+    # جلب ملفات mp3 داخل المجلد
     query = f"'{category_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and name contains '.mp3'"
     results = drive_service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
     files = results.get('files', [])
 
     if not files:
         print(f"❌ لا يوجد ملفات mp3 في {category}")
-        return
+        return None
 
     chosen_file = random.choice(files)
     file_id = chosen_file['id']
@@ -50,6 +60,7 @@ def download_first_audio(category):
     os.makedirs(local_folder, exist_ok=True)
     local_path = os.path.join(local_folder, file_name)
 
+    # تنزيل الملف
     request = drive_service.files().get_media(fileId=file_id)
     fh = io.FileIO(local_path, 'wb')
     downloader = MediaIoBaseDownload(fh, request)
@@ -60,6 +71,7 @@ def download_first_audio(category):
     print(f"✅ تم تحميل الصوت: {local_path}")
     return local_path
 
+# اختبار مباشر (يمكن حذفه في الإنتاج)
 if __name__ == "__main__":
     for keyword in ["rain", "wind"]:
         download_first_audio(keyword)
