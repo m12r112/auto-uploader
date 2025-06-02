@@ -2,7 +2,7 @@ name: Daily Fetch and Upload
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # يوميًا الساعة 2:00 صباحًا UTC (5:00 صباحًا بغداد)
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:
@@ -20,10 +20,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install dependencies (مع moviepy وكل اعتمادياتها)
         run: |
           pip install -r requirements.txt
-          pip install moviepy  # 👈 تثبيت moviepy يدويًا لتأكيد التثبيت
+          pip install moviepy imageio[ffmpeg] numpy decorator tqdm
 
       - name: ▶️ Run daily_fetch_and_upload.py
         run: python daily_fetch_and_upload.py
