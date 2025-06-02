@@ -25,17 +25,28 @@ DRIVE_MAIN_FOLDER = settings["main_drive_folder"]
 with open("keywords.json") as f:
     keywords = json.load(f)
 
+# تحقق من وجود ملف السجل، وإنشاؤه إذا لم يكن موجودًا
+if not os.path.exists("Published_Videos_Log.docx"):
+    doc = Document()
+    doc.add_paragraph("سجل الفيديوهات المنشورة")
+    doc.save("Published_Videos_Log.docx")
+
 # سجل الفيديوهات
 published_doc = Document("Published_Videos_Log.docx")
 published_titles = [p.text.strip() for p in published_doc.paragraphs if p.text.strip()]
 
 def fetch_video_links(keyword):
     url = f"https://www.pexels.com/search/videos/{keyword}/"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    video_tags = soup.find_all("video")
-    links = [tag.get("src") for tag in video_tags if tag.get("src")]
-    return links
+    try:
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        video_tags = soup.find_all("video")
+        links = [tag.get("src") for tag in video_tags if tag.get("src")]
+        return links
+    except Exception as e:
+        print(f"⚠️ خطأ في جلب الفيديوهات لـ {keyword}: {e}")
+        return []
 
 def upload_to_drive(filepath, filename, parent_folder_id):
     file_metadata = {'name': filename, 'parents': [parent_folder_id]}
@@ -68,12 +79,14 @@ for kw in keywords:
 
     try:
         with open(file_path, 'wb') as f:
-            f.write(requests.get(selected).content)
+            f.write(requests.get(selected, timeout=30).content)
 
         uploaded_id = upload_to_drive(file_path, filename, DRIVE_MAIN_FOLDER)
         print(f"✅ تم الرفع (ID: {uploaded_id})")
 
         published_doc.add_paragraph(selected)
         published_doc.save("Published_Videos_Log.docx")
+
+        os.remove(file_path)  # حذف الملف لتوفير المساحة
     except Exception as e:
-        print(f"❌ خطأ: {e}")
+        print(f"❌ خطأ أثناء التحميل أو الرفع: {e}")
