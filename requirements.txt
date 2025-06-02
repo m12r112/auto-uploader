@@ -2,5 +2,8 @@ requests
 python-docx
 beautifulsoup4
 google-auth
+google-auth-oauthlib
 google-api-python-client
 moviepy
+imageio[ffmpeg]
+tqdm
