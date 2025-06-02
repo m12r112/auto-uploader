@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # استخراج بيانات JSON من GitHub Secret
-service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
+service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
 
 # إنشاء ملف مؤقت لتمريره إلى Google
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as f:
