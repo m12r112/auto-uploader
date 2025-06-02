@@ -1,9 +1,8 @@
-
 name: Daily Fetch and Upload
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # يوميًا الساعة 2:00 صباحًا UTC (5:00 بغداد)
+    - cron: '0 2 * * *'  # يوميًا الساعة 2:00 صباحًا UTC (5:00 صباحًا بغداد)
   workflow_dispatch:     # يمكن تشغيله يدويًا أيضًا
 
 jobs:
@@ -21,7 +20,10 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          pip install requests python-docx
+          pip install -r requirements.txt
 
       - name: ▶️ Run daily_fetch_and_upload.py
         run: python daily_fetch_and_upload.py
+
+      - name: 🎬 Generate Reels with daily_reels_generator.py
+        run: python daily_reels_generator.py
