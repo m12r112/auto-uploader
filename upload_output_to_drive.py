@@ -6,10 +6,17 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# استخراج بيانات JSON من GitHub Secret
-service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
+OUTPUT_DIR = "output_reels"
 
-# إنشاء ملف مؤقت لتمريره إلى Google
+# ✅ تحقق من وجود مجلد الفيديوهات الناتجة قبل الرفع
+if not os.path.exists(OUTPUT_DIR):
+    print(f"⚠️ المجلد {OUTPUT_DIR} غير موجود، لا يوجد شيء لرفعه.")
+    exit(0)
+
+# 🔐 قراءة بيانات الخدمة من GitHub Secrets
+service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
+
+# إنشاء ملف مؤقت لتمريره إلى Google API
 with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as f:
     json.dump(service_account_info, f)
     SERVICE_ACCOUNT_FILE = f.name
@@ -19,8 +26,6 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 drive_service = build('drive', 'v3', credentials=credentials)
-
-OUTPUT_DIR = "output_reels"
 
 def get_or_create_folder(name, parent_id=None):
     """Return folder ID by name, or create it if it doesn't exist."""
