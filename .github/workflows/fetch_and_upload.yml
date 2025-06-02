@@ -33,3 +33,6 @@ jobs:
 
       - name: 🎬 Generate Reels with daily_reels_generator.py
         run: python daily_reels_generator.py
+
+      - name: ☁️ Upload output videos to Google Drive
+        run: python upload_output_to_drive.py
