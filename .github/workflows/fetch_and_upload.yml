@@ -1,8 +1,8 @@
-name: Daily Fetch and Upload
+name: Auto Upload Daily
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # يوميًا الساعة 2 صباحًا UTC = 5 صباحًا بتوقيت بغداد
+    - cron: '0 2 * * *'  # يوميًا الساعة 5 صباحًا بتوقيت بغداد
   workflow_dispatch:
 
 jobs:
@@ -20,11 +20,11 @@ jobs:
         with:
           python-version: '3.11'
 
-- name: 📦 Install dependencies (moviepy fix)
-  run: |
-    pip install -r requirements.txt
-    pip install moviepy==1.0.3
-    
+      - name: 📦 Install dependencies (moviepy fix)
+        run: |
+          pip install -r requirements.txt
+          pip install moviepy==1.0.3
+
       - name: 🧪 Check if moviepy is installed
         run: python -c "import moviepy.editor; print('✅ moviepy موجود')"
 
