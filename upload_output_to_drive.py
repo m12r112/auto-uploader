@@ -1,12 +1,19 @@
-
 import os
+import json
+import tempfile
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# إعداد الاتصال بـ Google Drive
-SERVICE_ACCOUNT_FILE = 'service_account.json'
+# استخراج بيانات JSON من GitHub Secret
+service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
+
+# إنشاء ملف مؤقت لتمريره إلى Google
+with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".json") as f:
+    json.dump(service_account_info, f)
+    SERVICE_ACCOUNT_FILE = f.name
+
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 credentials = service_account.Credentials.from_service_account_file(
@@ -24,7 +31,7 @@ def get_or_create_folder(name, parent_id=None):
     folders = results.get('files', [])
     if folders:
         return folders[0]['id']
-
+    
     file_metadata = {
         'name': name,
         'mimeType': 'application/vnd.google-apps.folder',
