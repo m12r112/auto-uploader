@@ -1,4 +1,4 @@
-name: Auto Upload Daily
+name: fetch_and_upload.yml
 
 on:
   schedule:
