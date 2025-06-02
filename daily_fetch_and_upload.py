@@ -1,4 +1,3 @@
-
 import os
 import json
 import requests
@@ -9,10 +8,12 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from docx import Document
 
-# تحميل بيانات الحساب الخدمي من متغير بيئة (GitHub Secret)
+# إعداد التفويض باستخدام GitHub Secret
+SCOPES = ['https://www.googleapis.com/auth/drive']
 key_data = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
 credentials = service_account.Credentials.from_service_account_info(key_data, scopes=SCOPES)
 service = build('drive', 'v3', credentials=credentials)
+
 # إعدادات المجلدات
 with open("settings.json") as f:
     settings = json.load(f)
