@@ -3,3 +3,4 @@ python-docx
 beautifulsoup4
 google-auth
 google-api-python-client
+moviepy
