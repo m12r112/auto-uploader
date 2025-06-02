@@ -20,10 +20,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install dependencies (مع moviepy وكل اعتمادياتها)
-        run: |
-          pip install -r requirements.txt
-
+- name: 📦 Install dependencies (moviepy fix)
+  run: |
+    pip install -r requirements.txt
+    pip install moviepy==1.0.3
+    
       - name: 🧪 Check if moviepy is installed
         run: python -c "import moviepy.editor; print('✅ moviepy موجود')"
 
