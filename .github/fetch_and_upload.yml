@@ -1,0 +1,27 @@
+
+name: Daily Fetch and Upload
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # يوميًا الساعة 2:00 صباحًا UTC (5:00 بغداد)
+  workflow_dispatch:     # يمكن تشغيله يدويًا أيضًا
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install requests python-docx
+
+      - name: ▶️ Run daily_fetch_and_upload.py
+        run: python daily_fetch_and_upload.py
