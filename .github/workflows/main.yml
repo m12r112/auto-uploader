@@ -8,6 +8,8 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    env:
+      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
     steps:
     - name: Checkout repository
@@ -21,10 +23,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-
-    - name: Create service_account.json
-      run: |
-        echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" > service_account.json
 
     - name: Run script
       run: python daily_fetch_and_upload.py
