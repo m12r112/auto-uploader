@@ -1,13 +1,15 @@
-name: Daily Automation
+name: Fetch videos and audio
 
 on:
   schedule:
-    - cron: '0 5 * * *'  # يوميًا الساعة 5:00 صباحًا بتوقيت بغداد
-  workflow_dispatch:
+    - cron: '0 5 * * *'  # يعمل يوميًا الساعة 5 صباحًا بتوقيت UTC
+  workflow_dispatch:     # لتشغيله يدويًا من GitHub
 
 jobs:
-  auto-run:
+  fetch-videos:
     runs-on: ubuntu-latest
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -21,26 +23,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch videos and audio
+      - name: Run daily fetch and upload script
         run: python daily_fetch_and_upload.py
-        env:
-          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-
-      - name: Generate Reels
-        run: python daily_reels_generator.py
-
-      - name: Generate Captions using GPT4Free
-        run: python generate_caption.py
-
-      - name: Upload to Google Drive
-        run: python upload_to_drive.py
-        env:
-          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-
-      - name: Send weekly report
-        run: python send_weekly_report.py
-        env:
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-
-      - name: Clean up local videos
-        run: python cleanup_local.py
