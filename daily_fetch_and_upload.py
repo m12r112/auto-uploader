@@ -32,17 +32,27 @@ PEXELS_API_URL = "https://api.pexels.com/videos/search"
 headers = {"Authorization": PEXELS_API_KEY}
 
 def fetch_video_url(keyword):
+    print(f"🔍 [Pexels] Searching for '{keyword}'...")
     params = {"query": keyword, "per_page": 20}
     response = requests.get(PEXELS_API_URL, headers=headers, params=params)
     if response.status_code == 200:
         data = response.json()
-        candidates = [file["link"] for video in data.get("videos", []) for file in video.get("video_files", [])
-                      if file.get("width") == 1080 and file.get("height") >= 1080 and file.get("quality") == "sd"]
+        candidates = []
+        for video in data.get("videos", []):
+            for file in video.get("video_files", []):
+                width = file.get("width")
+                height = file.get("height")
+                if width and height and height > width and height >= 720:
+                    candidates.append(file["link"])
         if candidates:
-            return random.choice(candidates)
+            selected = random.choice(candidates)
+            print(f"🔗 Selected vertical video: {selected}")
+            return selected
+    print(f"❌ No vertical video found for keyword: {keyword}")
     return None
 
 def download_video(url, save_path):
+    print(f"⬇️ Downloading to {save_path} ...")
     r = requests.get(url, stream=True)
     with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
@@ -82,13 +92,14 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
     drive_service = build("drive", "v3", credentials=creds)
 
     try:
-        # إنشاء مجلد Videos داخل AutoUploader
+        # 🔹 إنشاء مجلد Videos داخل المجلد الرئيسي
         videos_root_id = get_or_create_folder(drive_service, parent_folder_id, "Videos")
 
-        # ثم مجلد النوع مثل rain أو thunder
+        # 🔹 ثم مجلد باسم نوع الفيديو (rain، thunder...) داخل Videos
         keyword_folder_id = get_or_create_folder(drive_service, videos_root_id, keyword)
     except HttpError as e:
         print(f"❌ Error creating folders: {e}")
+        print(str(e))
         return
 
     file_metadata = {
@@ -103,16 +114,17 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
             media_body=media,
             fields="id, name"
         ).execute()
-        print(f"✅ Uploaded to Drive: {uploaded['name']} (ID: {uploaded['id']}) in '{keyword}' folder")
+        print(f"✅ Uploaded to Drive: {uploaded['name']} (ID: {uploaded['id']}) in folder '{keyword}'")
     except HttpError as e:
         print(f"❌ Error uploading file: {e}")
+        print(str(e))
 
 def main():
+    print(f"📁 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
     for keyword in selected_keywords:
-        print(f"🔍 Searching for: {keyword}")
+        print(f"\n🔍 Searching for: {keyword}")
         video_url = fetch_video_url(keyword)
         if not video_url:
-            print(f"❌ No video found for keyword: {keyword}")
             continue
 
         keyword_dir = VIDEO_ROOT / keyword
