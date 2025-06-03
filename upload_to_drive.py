@@ -59,10 +59,13 @@ def upload_all_videos(service):
     auto_folder = get_or_create_folder(service, "AutoUploader")
     reels_folder = get_or_create_folder(service, "UploadedReels", parent_id=auto_folder)
 
+    print("📂 Scanning for videos in:", OUTPUT_DIR)
     for keyword_folder in OUTPUT_DIR.iterdir():
+        print(f"🔎 Found folder: {keyword_folder}")
         if not keyword_folder.is_dir():
             continue
         for video_file in keyword_folder.glob("*.mp4"):
+            print(f"🎬 Video ready: {video_file}")
             upload_file(service, video_file, reels_folder)
 
 def main():
