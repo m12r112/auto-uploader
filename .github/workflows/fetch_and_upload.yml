@@ -30,7 +30,9 @@ jobs:
           python -c "import os, json; json.dump(json.loads(os.environ['SERVICE_ACCOUNT_KEY']), open('service_account.key', 'w'))"
 
       - name: 🎬 Run video fetch and upload script
-        run: python daily_fetch_and_upload.py
+        run: |
+          export PEXELS_API_KEY="${PEXELS_API_KEY}"
+          python daily_fetch_and_upload.py
 
       - name: 🛠️ Generate final reels with audio
         run: python daily_reels_generator.py
