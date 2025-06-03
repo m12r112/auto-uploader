@@ -8,10 +8,11 @@ on:
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
+
+    # نمرّر هذه المتغيّرات مباشرة إلى جميع الخطوات، لكن سنعيد تعريف PEXELS_API_KEY خطوة بخطوة
     env:
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      DRIVE_FOLDER_ID:     ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
       - name: 📥 Checkout repository
@@ -30,9 +31,10 @@ jobs:
           python -c "import os, json; json.dump(json.loads(os.environ['SERVICE_ACCOUNT_KEY']), open('service_account.key', 'w'))"
 
       - name: 🎬 Run video fetch and upload script
-        run: |
-          export PEXELS_API_KEY="${PEXELS_API_KEY}"
-          python daily_fetch_and_upload.py
+        # هنا نعرف PEXELS_API_KEY مُباشرةً كي يصل للسكربت دون مشاكل
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python daily_fetch_and_upload.py
 
       - name: 🛠️ Generate final reels with audio
         run: python daily_reels_generator.py
