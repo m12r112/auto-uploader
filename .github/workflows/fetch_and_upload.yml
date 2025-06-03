@@ -3,7 +3,7 @@ name: Auto Upload Daily
 on:
   schedule:
     - cron: '0 7 * * *'       # ⏰ يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:           # 🚀 تشغيل يدوي
+  workflow_dispatch:
 
 jobs:
   run-script:
