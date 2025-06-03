@@ -2,8 +2,8 @@ name: Fetch videos and audio
 
 on:
   schedule:
-    - cron: '0 7 * * *'  # ⏰ يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:     # 🚀 تشغيل يدوي عند الحاجة
+    - cron: '0 7 * * *'  # يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
+  workflow_dispatch:
 
 jobs:
   fetch-videos:
@@ -22,12 +22,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📦 Install Python dependencies
+      - name: 📦 Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 🔑 Write service_account.key file (safe method)
+      - name: 📝 Write service_account.key using Python (safe method)
         run: |
-          printf '%s' "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
+          python -c "import os, json; json.dump(json.loads(os.environ['SERVICE_ACCOUNT_KEY']), open('service_account.key', 'w'))"
 
       - name: 🎬 Run video fetch and upload script
         run: python daily_fetch_and_upload.py
