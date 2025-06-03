@@ -1,53 +1,52 @@
 name: Fetch videos and audio
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 7 * * *'  # يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:     # للإطلاق اليدوي عند الحاجة
+    - cron: '0 7 * * *'
 
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
 
-    # ندع هنا فقط المتغيّر الخاص بخدمة Google Drive (يُستخدم لإنشاء service_account.key)
+    # لا نبقي إلا SERVICE_ACCOUNT_KEY هنا
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
     steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+      - uses: actions/setup-python@v4
+        with: { python-version: '3.10' }
 
-      - name: 📦 Install dependencies
+      - name: Install deps
         run: |
-          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: 📝 Write service_account.key using Python
+      - name: Write service_account.key
         run: |
-          python - << 'PYCODE'
-import os, json
-data = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
-with open("service_account.key","w") as f:
-    json.dump(data, f)
-PYCODE
+          python - << 'PY'
+import os, json, textwrap
+key = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
+with open("service_account.key", "w") as f:
+    json.dump(key, f)
+print("✅ service_account.key written")
+PY
 
-      - name: 🎬 Run fetch-and-upload script
-        # هنا نعّرف كل ما يحتاجه السكربت: مفتاح Pexels وDRIVE_FOLDER_ID
+      # ⬇️⬇️ خطوة تشخيص المتغيّرات
+      - name: DEBUG –- show env vars
+        env:
+          PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: |
+          echo "PEXELS_API_KEY = '${PEXELS_API_KEY}'"
+          echo "PEXELS_API_KEY length = ${#PEXELS_API_KEY}"
+          echo "DRIVE_FOLDER_ID  = '${DRIVE_FOLDER_ID}'"
+          echo "DRIVE_FOLDER_ID length = ${#DRIVE_FOLDER_ID}"
+
+      # ⬇️⬇️ الخطوة الفعلية
+      - name: Run fetch-and-upload script
         env:
           PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
-
-      - name: 🛠️ Generate final reels with audio
-        run: python daily_reels_generator.py
-
-      - name: 🧠 Generate captions using GPT
-        run: python generate_caption.py
-
-      - name: ☁️ Upload captions.json to Google Drive
-        run: python upload_captions_to_drive.py
