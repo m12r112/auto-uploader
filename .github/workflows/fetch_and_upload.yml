@@ -2,8 +2,8 @@ name: Fetch videos and audio
 
 on:
   schedule:
-    - cron: '0 7 * * *'  # ⏰ يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:     # 🚀 لتشغيله يدويًا من GitHub
+    - cron: '0 7 * * *'  # ⏰ يوميًا الساعة 7 صباحًا بتوقيت UTC
+  workflow_dispatch:     # 🚀 تشغيل يدوي عند الحاجة
 
 jobs:
   fetch-videos:
@@ -14,7 +14,7 @@ jobs:
       DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
-      - name: 📦 Checkout repository
+      - name: 📥 Checkout repository
         uses: actions/checkout@v3
 
       - name: 🐍 Set up Python
@@ -22,16 +22,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 📥 Install dependencies
+      - name: 📦 Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: 📝 Write service_account.key file
-        run: echo "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
+      - name: 🔑 Write service_account.key file (safe method)
+        run: |
+          printf '%s' "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
 
-      - name: 📹 Run daily fetch and upload script
+      - name: 🎬 Run video fetch and upload script
         run: python daily_fetch_and_upload.py
 
-      - name: 🎞️ Generate final reels with audio
+      - name: 🛠️ Generate final reels with audio
         run: python daily_reels_generator.py
 
       - name: 🧠 Generate captions using GPT
