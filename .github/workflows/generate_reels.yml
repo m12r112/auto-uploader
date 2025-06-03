@@ -1,41 +1,66 @@
-name: Generate and Upload Reels
+import os
+import io
+from pathlib import Path
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
-on:
-  schedule:
-    - cron: '0 3 * * *'  # ⏰ يوميًا الساعة 6 صباحًا بتوقيت بغداد
-  workflow_dispatch:     # ⚡ للتشغيل اليدوي عند الحاجة
+# إعداد حساب الخدمة
+SERVICE_ACCOUNT_KEY = os.environ["SERVICE_ACCOUNT_KEY"]
 
-jobs:
-  generate-reels:
-    runs-on: ubuntu-latest
+with open("service_account.key", "w") as f:
+    f.write(SERVICE_ACCOUNT_KEY)
 
-    env:
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+creds = service_account.Credentials.from_service_account_file(
+    "service_account.key",
+    scopes=["https://www.googleapis.com/auth/drive"]
+)
+drive_service = build("drive", "v3", credentials=creds)
 
-    steps:
-      - name: ✅ Clone repository
-        uses: actions/checkout@v3
+def get_folder_id_by_name(name, parent_id=None):
+    query = f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    if parent_id:
+        query += f" and '{parent_id}' in parents"
+    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+    files = results.get("files", [])
+    return files[0]["id"] if files else None
 
-      - name: 🐍 Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+def download_folder(folder_id, local_path):
+    Path(local_path).mkdir(parents=True, exist_ok=True)
+    results = drive_service.files().list(
+        q=f"'{folder_id}' in parents and trashed = false",
+        fields="files(id, name, mimeType)"
+    ).execute()
+    files = results.get("files", [])
+    for file in files:
+        file_path = os.path.join(local_path, file["name"])
+        if file["mimeType"] == "application/vnd.google-apps.folder":
+            download_folder(file["id"], file_path)
+        else:
+            request = drive_service.files().get_media(fileId=file["id"])
+            with open(file_path, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+            print(f"✅ Downloaded: {file_path}")
 
-      - name: 📦 Install dependencies
-        run: |
-          pip install -r requirements.txt
+def main():
+    print("🔍 Searching for 'AutoUploader'...")
+    root_id = get_folder_id_by_name("AutoUploader")
+    if not root_id:
+        print("❌ 'AutoUploader' folder not found.")
+        return
 
-      - name: 🔑 Write service account key
-        run: echo "$SERVICE_ACCOUNT_KEY" > service_account.key
+    print("🔍 Searching for 'audio_library' inside AutoUploader...")
+    audio_root_id = get_folder_id_by_name("audio_library", parent_id=root_id)
+    if not audio_root_id:
+        print("❌ 'audio_library' folder not found.")
+        return
 
-      - name: ⬇️ Download videos from Google Drive
-        run: python download_videos_from_drive.py
+    print("⬇️ Downloading audio files to local 'audio_library/'...")
+    download_folder(audio_root_id, "audio_library")
+    print("✅ All audio files downloaded successfully.")
 
-      - name: 🎵 Download audio from Google Drive
-        run: python download_audio_from_drive.py
-
-      - name: 🎬 Generate reels and upload
-        run: python daily_reels_generator.py
+if __name__ == "__main__":
+    main()
