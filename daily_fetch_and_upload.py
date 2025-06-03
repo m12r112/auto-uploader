@@ -1,112 +1,75 @@
+# ✅ daily_fetch_and_upload.py (مُحدَّث)
+
 import os
-import json
-import random
 import requests
+import random
+from moviepy.editor import VideoFileClip
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+import json
 
-# 🛠 إعداد المتغيرات من GitHub Secrets
-PEXELS_API_KEY = os.environ["PEXELS_API_KEY"]
+# 🗝️ تحميل مفتاح الخدمة
 SERVICE_ACCOUNT_KEY = os.environ["SERVICE_ACCOUNT_KEY"]
-DRIVE_FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
-
-# 🔐 حفظ مفتاح الخدمة مؤقتًا
 with open("service_account.key", "w") as f:
     f.write(SERVICE_ACCOUNT_KEY)
 
-# 🧠 اختيار نوعين عشوائيين يوميًا
-with open("keywords.json") as f:
-    keywords = json.load(f)["keywords"]
-
-selected_keywords = random.sample(keywords, 2)
-
-# 📁 مجلد حفظ الفيديوهات محليًا
-videos_dir = Path("videos")
-videos_dir.mkdir(exist_ok=True)
-
-# 🔧 إعداد Google Drive API
-credentials = service_account.Credentials.from_service_account_file(
+creds = service_account.Credentials.from_service_account_file(
     "service_account.key",
     scopes=["https://www.googleapis.com/auth/drive"]
 )
-drive_service = build("drive", "v3", credentials=credentials)
+drive_service = build("drive", "v3", credentials=creds)
 
+# 🔁 تحميل كلمات البحث من keywords.json
+with open("keywords.json") as f:
+    keywords = json.load(f)["keywords"]
 
-def get_pexels_video(keyword):
-    headers = {"Authorization": PEXELS_API_KEY}
-    url = f"https://api.pexels.com/videos/search?query={keyword}&orientation=portrait&per_page=10"
-    res = requests.get(url, headers=headers)
-    res.raise_for_status()
-    data = res.json()
+PEXELS_API_KEY = os.environ["PEXELS_API_KEY"]
+PEXELS_API_URL = "https://api.pexels.com/videos/search"
 
-    candidates = []
-    for video in data.get("videos", []):
-        if video["duration"] <= 60:
-            for f in video["video_files"]:
-                if f["height"] >= 720 and f["width"] < f["height"]:
-                    candidates.append(f["link"])
-                    break
+headers = {"Authorization": PEXELS_API_KEY}
 
-    return random.choice(candidates) if candidates else None
+# 🧠 اختيار كلمتين عشوائيًا يوميًا
+random_keywords = random.sample(keywords, 2)
 
+for keyword in random_keywords:
+    print(f"🔍 يبحث عن: {keyword}")
+    response = requests.get(PEXELS_API_URL, params={"query": keyword, "orientation": "portrait", "per_page": 10}, headers=headers)
+    results = response.json().get("videos", [])
 
-def get_or_create_folder(folder_name, parent_id):
-    """إنشاء مجلد على Google Drive داخل parent_id إذا لم يكن موجودًا"""
-    query = f"'{parent_id}' in parents and name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed = false"
-    res = drive_service.files().list(q=query, fields="files(id)").execute()
-    files = res.get("files", [])
-    if files:
-        return files[0]["id"]
-    else:
-        metadata = {
-            "name": folder_name,
-            "mimeType": "application/vnd.google-apps.folder",
-            "parents": [parent_id]
-        }
-        folder = drive_service.files().create(body=metadata, fields="id").execute()
-        return folder["id"]
+    Path(f"videos/{keyword}").mkdir(parents=True, exist_ok=True)
 
+    count = 0
+    for video in results:
+        if count >= 2:
+            break
+        video_url = video["video_files"][-1]["link"]  # أعلى جودة غالبًا
+        video_id = video["id"]
+        video_path = f"videos/{keyword}/{keyword}_{video_id}.mp4"
 
-def upload_to_drive(filepath: Path, parent_folder_id: str, keyword: str):
-    # 🔁 تأكد أن مجلد Videos موجود داخل AutoUploader
-    videos_root_id = get_or_create_folder("Videos", parent_folder_id)
-
-    # 🔁 تأكد أن مجلد النوع موجود داخل Videos
-    keyword_folder_id = get_or_create_folder(keyword, videos_root_id)
-
-    # ⬆️ رفع الملف إلى مجلد النوع
-    file_metadata = {
-        "name": filepath.name,
-        "parents": [keyword_folder_id]
-    }
-    media = MediaFileUpload(str(filepath), resumable=True)
-    drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
-
-
-def main():
-    for keyword in selected_keywords:
-        print(f"[🔍 Pexels] Searching for '{keyword}' …")
-        link = get_pexels_video(keyword)
-        if not link:
-            print(f"[❌] No suitable video found for '{keyword}'")
+        # 💾 تحميل الفيديو
+        try:
+            r = requests.get(video_url, timeout=30)
+            with open(video_path, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            print(f"❌ فشل التحميل: {e}")
             continue
 
-        filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
-        save_to = videos_dir / keyword / filename
-        save_to.parent.mkdir(parents=True, exist_ok=True)
+        # ✅ تحقق من الطول والعمودية والصوت
+        try:
+            clip = VideoFileClip(video_path)
+            if clip.h > clip.w and clip.audio is not None:
+                print(f"✅ مقبول: {video_path}")
+                count += 1
+            else:
+                print(f"⛔ مستبعد (ليس عمودي أو صامت): {video_path}")
+                os.remove(video_path)
+        except Exception as e:
+            print(f"⚠️ خطأ عند التحقق: {e}")
+            if os.path.exists(video_path):
+                os.remove(video_path)
+            continue
 
-        print(f"[⬇️] Downloading: {link}")
-        with requests.get(link, stream=True) as r:
-            r.raise_for_status()
-            with open(save_to, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-        print(f"[✅] Saved: {save_to.name}")
-        upload_to_drive(save_to, DRIVE_FOLDER_ID, keyword)
-
-
-if __name__ == "__main__":
-    main()
+# ✅ سيتم لاحقًا نسخ 2 فقط من هذه الفيديوهات إلى output_reels/
