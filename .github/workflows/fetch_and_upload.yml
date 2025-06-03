@@ -1,4 +1,4 @@
-name: fetch_and_upload
+name: Daily Fetch and Upload
 
 on:
   schedule:
@@ -32,8 +32,11 @@ jobs:
       - name: 🎬 Generate Reels with daily_reels_generator.py
         run: python daily_reels_generator.py
 
-      - name: ✍️ Generate captions using GPT
+      - name: 🧠 Generate captions using GPT
         run: python generate_caption.py
 
-      - name: ☁️ Upload final videos to Drive
+      - name: ☁️ Upload output reels to Google Drive
         run: python upload_output_to_drive.py
+
+      - name: 📨 Send weekly report
+        run: python send_weekly_report.py
