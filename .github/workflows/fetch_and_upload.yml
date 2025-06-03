@@ -1,17 +1,19 @@
-name: Fetch videos and audio
+name: Fetch videos and upload to Drive
 
 on:
   schedule:
-    - cron: '0 5 * * *'  # يعمل يوميًا الساعة 5 صباحًا بتوقيت UTC
-  workflow_dispatch:     # لتشغيله يدويًا من GitHub
+    - cron: '0 5 * * *'   # يعمل يوميًا الساعة 5 صباحًا بتوقيت UTC
+  workflow_dispatch:      # لإمكانية التشغيل يدويًا من واجهة GitHub
 
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
+
+    # تمرير المتغيرات البيئية إلى السكربت
     env:
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PEXELS_API_KEY:    ${{ secrets.PEXELS_API_KEY }}
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      DRIVE_FOLDER_ID:     ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
       - name: Checkout repository
@@ -23,11 +25,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Write service_account.key file
         run: |
-          echo "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
+          echo "${{ env.SERVICE_ACCOUNT_KEY }}" > service_account.key
 
       - name: Run daily fetch and upload script
         run: python daily_fetch_and_upload.py
