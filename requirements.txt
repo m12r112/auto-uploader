@@ -1,7 +1,7 @@
-g4f
 requests
-python-docx
 beautifulsoup4
+python-docx
+g4f
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
