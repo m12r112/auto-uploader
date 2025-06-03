@@ -22,7 +22,7 @@ selected_keywords = random.sample(keywords, k=2)
 # 4) قراءة مفتاح Pexels من environment
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 if not PEXELS_API_KEY:
-    # بدلًا من رفع استثناء قاتل، نطبع تحذير ونستمر (حتى لو لم نجد مفتاح)
+    # بدلًا من رفع استثناء قاتل، نطبع تحذير ونستمر (حتى لو لم نجد المفتاح)
     print("⚠️ WARNING: PEXELS_API_KEY not found in env. Skipping Pexels API.")
 else:
     print(f"🔐 PEXELS_API_KEY found (starts with): {PEXELS_API_KEY[:6]}...")
@@ -159,14 +159,12 @@ def main():
         print(f"\n🔍 Searching for: {keyword}")
         video_url = fetch_video_url(keyword)
 
-        # إذا لم يُوجد PEXELS_API_KEY أو لم يجد فيديو من Pexels، يمكنك استبدال “video_url”
-        # برابط ثابت أو تجربة كلمة أخرى. للتجربة الآن فقط نطبع رسالة:
+        # إذا لم يُوجد PEXELS_API_KEY أو لم يجد فيديو من Pexels، نستخدم رابط Vimeo الثابتُّ أدناه
         if not video_url:
-            print(f"⚠️ Using fallback static URL for '{keyword}'.")
-            # مثال: رابط Vimeo ثابت للعرض (يمكنك تغييره لأي رابط صالح)
-            video_url = "https://player.vimeo.com/external/411138813.sd.mp4?s=...
+            print(f"⚠️ Using fallback Vimeo URL for '{keyword}'.")
+            video_url = "https://player.vimeo.com/external/411138813.sd.mp4?s=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&profile_id=165&oauth2_token_id=xxxxxxxxxxxx"
 
-        # الآن نحمّل الفيديو من الرابط (سواء من Pexels أو من الرابط الثابت)
+        # نحمّل الفيديو
         filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
         keyword_dir = VIDEO_ROOT / keyword
         keyword_dir.mkdir(parents=True, exist_ok=True)
