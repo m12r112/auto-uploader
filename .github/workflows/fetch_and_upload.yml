@@ -1,4 +1,4 @@
-name: fetch_and_upload.yml
+name: fetch_and_upload
 
 on:
   schedule:
@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: 🧾 Checkout repository
@@ -20,13 +21,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install dependencies (moviepy fix)
+      - name: 📦 Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install moviepy==1.0.3
-
-      - name: 🧪 Check if moviepy is installed
-        run: python -c "import moviepy.editor; print('✅ moviepy موجود')"
+          pip install moviepy==1.0.3 openai
 
       - name: ▶️ Run daily_fetch_and_upload.py
         run: python daily_fetch_and_upload.py
@@ -34,5 +32,8 @@ jobs:
       - name: 🎬 Generate Reels with daily_reels_generator.py
         run: python daily_reels_generator.py
 
-      - name: ☁️ Upload output videos to Google Drive and clean up
-        run: python upload_output_to_drive_final.py
+      - name: ✍️ Generate captions using GPT
+        run: python generate_caption.py
+
+      - name: ☁️ Upload final videos to Drive
+        run: python upload_output_to_drive.py
