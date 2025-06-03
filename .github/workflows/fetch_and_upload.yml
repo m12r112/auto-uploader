@@ -9,8 +9,9 @@ jobs:
   fetch-videos:
     runs-on: ubuntu-latest
     env:
+      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      # لن نضع PEXELS_API_KEY هنا كي لا يتداخل مع خطوة إعادة تعريف env الكاملة
       DRIVE_FOLDER_ID:      ${{ secrets.DRIVE_FOLDER_ID }}
-      SERVICE_ACCOUNT_KEY:  ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
     steps:
       - name: 📥 Checkout repository
@@ -37,7 +38,9 @@ PYCODE
 
       - name: 🎬 Run fetch-and-upload script
         env:
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          # هنا نمرّر كل ما يحتاجه السكربت: مفتاح Pexels ومعرّف الـ Drive
+          PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
 
       - name: 🛠️ Generate final reels with audio
