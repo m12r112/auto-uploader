@@ -5,26 +5,32 @@ import requests
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
-# إعداد مجلدات التخزين
+# 📁 إعداد مجلدات التخزين
 VIDEO_ROOT = Path("videos")
 VIDEO_ROOT.mkdir(exist_ok=True)
 
-# تحميل الكلمات المفتاحية
+# 📥 تحميل الكلمات المفتاحية
 with open("keywords.json") as f:
     keywords = json.load(f)["keywords"]
 
-# اختيار كلمتين عشوائيتين
+# 🧠 اختيار كلمتين عشوائيتين
 selected_keywords = random.sample(keywords, k=2)
 
-# إعداد Pexels API
+# 🔐 إعداد مفاتيح API
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 if not PEXELS_API_KEY:
     raise Exception("❌ PEXELS_API_KEY not found in environment.")
 
+DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")
+if not DRIVE_FOLDER_ID:
+    raise Exception("❌ DRIVE_FOLDER_ID not found in environment.")
+
 PEXELS_API_URL = "https://api.pexels.com/videos/search"
 headers = {"Authorization": PEXELS_API_KEY}
 
+# 🌐 جلب رابط الفيديو من Pexels
 def fetch_video_url(keyword):
     params = {"query": keyword, "per_page": 5}
     response = requests.get(PEXELS_API_URL, headers=headers, params=params)
@@ -36,6 +42,7 @@ def fetch_video_url(keyword):
                     return file["link"]
     return None
 
+# 💾 تحميل الفيديو محليًا
 def download_video(url, save_path):
     r = requests.get(url, stream=True)
     with open(save_path, "wb") as f:
@@ -43,6 +50,30 @@ def download_video(url, save_path):
             f.write(chunk)
     print(f"✅ Downloaded: {save_path}")
 
+# ☁️ رفع الفيديو إلى Google Drive
+def upload_to_drive(local_file_path, folder_id):
+    # تحميل بيانات اعتماد حساب الخدمة
+    creds = service_account.Credentials.from_service_account_file(
+        "service_account.key",
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    drive_service = build("drive", "v3", credentials=creds)
+
+    # إعداد معلومات الملف
+    file_metadata = {
+        "name": os.path.basename(local_file_path),
+        "parents": [folder_id]
+    }
+    media = MediaFileUpload(local_file_path, mimetype="video/mp4")
+    uploaded = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id, name"
+    ).execute()
+
+    print(f"✅ Uploaded to Drive: {uploaded['name']} ({uploaded['id']})")
+
+# ▶️ الدالة الرئيسية
 def main():
     for keyword in selected_keywords:
         print(f"🔍 Searching for: {keyword}")
@@ -58,6 +89,7 @@ def main():
         save_path = keyword_dir / filename
 
         download_video(video_url, save_path)
+        upload_to_drive(str(save_path), DRIVE_FOLDER_ID)
 
 if __name__ == "__main__":
     main()
