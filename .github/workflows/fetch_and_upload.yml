@@ -9,8 +9,8 @@ jobs:
   fetch-videos:
     runs-on: ubuntu-latest
     env:
-      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      DRIVE_FOLDER_ID:      ${{ secrets.DRIVE_FOLDER_ID }}
+      SERVICE_ACCOUNT_KEY:  ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
     steps:
       - name: 📥 Checkout repository
@@ -31,7 +31,8 @@ jobs:
           python - << 'PYCODE'
 import os, json
 data = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
-with open("service_account.key","w") as f: json.dump(data, f)
+with open("service_account.key","w") as f:
+    json.dump(data, f)
 PYCODE
 
       - name: 🎬 Run fetch-and-upload script
