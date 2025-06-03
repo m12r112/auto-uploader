@@ -28,5 +28,8 @@ jobs:
       - name: 🔑 Write service account key
         run: echo "$SERVICE_ACCOUNT_KEY" > service_account.key
 
+      - name: ⬇️ Download videos from Google Drive
+        run: python download_videos_from_drive.py
+
       - name: 🎬 Run daily reels generator
         run: python daily_reels_generator.py
