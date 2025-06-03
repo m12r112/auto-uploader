@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
       - name: Checkout repository
@@ -22,6 +24,10 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Write service_account.key file
+        run: |
+          echo "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
 
       - name: Run daily fetch and upload script
         run: python daily_fetch_and_upload.py
