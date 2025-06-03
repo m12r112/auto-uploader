@@ -1,42 +1,40 @@
-name: Daily Fetch and Upload
+name: Daily Automation
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # يوميًا الساعة 5 صباحًا بتوقيت بغداد
+    - cron: '0 5 * * *'  # يوميًا الساعة 5:00 صباحًا بتوقيت بغداد
   workflow_dispatch:
 
 jobs:
-  run-script:
+  auto-run:
     runs-on: ubuntu-latest
-    env:
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
-      - name: 🧾 Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
-      - name: 📦 Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install moviepy==1.0.3 openai
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      - name: ▶️ Run daily_fetch_and_upload.py
+      - name: Fetch videos and audio
         run: python daily_fetch_and_upload.py
 
-      - name: 🎬 Generate Reels with daily_reels_generator.py
+      - name: Generate Reels
         run: python daily_reels_generator.py
 
-      - name: 🧠 Generate captions using GPT
+      - name: Generate Captions using GPT4Free
         run: python generate_caption.py
 
-      - name: ☁️ Upload output reels to Google Drive
-        run: python upload_output_to_drive.py
+      - name: Upload to Google Drive
+        run: python upload_to_drive.py
 
-      - name: 📨 Send weekly report
+      - name: Send weekly report
         run: python send_weekly_report.py
+
+      - name: Clean up local videos
+        run: python cleanup_local.py
