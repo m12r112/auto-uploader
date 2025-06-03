@@ -1,110 +1,70 @@
 import os
-import json
-import random
-from datetime import datetime
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_audioclips
 from pathlib import Path
+from moviepy.editor import VideoFileClip, AudioFileClip
+from docx import Document
+from datetime import datetime
+import shutil
 
-VIDEO_ROOT = Path("videos")
-AUDIO_ROOT = Path("audio_library")
-LOG_ROOT = Path("used_sounds_log")
-OUTPUT_ROOT = Path("output_reels")
+VIDEOS_DIR = Path("videos")
+AUDIO_DIR = Path("audio_library")
+OUTPUT_DIR = Path("output_reels")
+LOG_FILE = Path("Published_Videos_Log.docx")
 
-# تحميل الكلمات المفتاحية
-with open("keywords.json") as f:
-    keywords = json.load(f)["keywords"]
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-# تأكد من وجود المجلدات الجذرية
-for root in [VIDEO_ROOT, AUDIO_ROOT, LOG_ROOT, OUTPUT_ROOT]:
-    root.mkdir(exist_ok=True)
-
-def get_unused_audio(keyword):
-    audio_dir = AUDIO_ROOT / keyword
-    audio_dir.mkdir(parents=True, exist_ok=True)
-
-    used_log_file = LOG_ROOT / f"{keyword}.txt"
-    used_sounds = set()
-    if used_log_file.exists():
-        with open(used_log_file, 'r') as f:
-            used_sounds = set(line.strip() for line in f)
-
-    all_sounds = [f for f in os.listdir(audio_dir) if f.endswith('.mp3')]
-    if not all_sounds:
-        print(f"⚠️ لا توجد ملفات صوت في: {audio_dir}")
-        return None
-
-    unused_sounds = list(set(all_sounds) - used_sounds)
-    if not unused_sounds:
-        unused_sounds = all_sounds
-        used_sounds = set()
-
-    selected = random.choice(unused_sounds)
-    with open(used_log_file, 'a') as f:
-        if selected not in used_sounds:
-            f.write(f"{selected}\n")
-
-    return str(audio_dir / selected)
-
-def match_audio_duration(audio_path, duration):
-    original_audio = AudioFileClip(audio_path)
-    if original_audio.duration > duration:
-        return original_audio.subclip(0, duration)
+def log_video(keyword, filename):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    if LOG_FILE.exists():
+        doc = Document(LOG_FILE)
     else:
-        loops = int(duration // original_audio.duration)
-        remainder = duration % original_audio.duration
-        clips = [original_audio] * loops
-        if remainder > 0:
-            clips.append(original_audio.subclip(0, remainder))
-        return concatenate_audioclips(clips)
+        doc = Document()
+        doc.add_heading("Published Videos Log", 0)
+        table = doc.add_table(rows=1, cols=3)
+        hdr = table.rows[0].cells
+        hdr[0].text = "Date"
+        hdr[1].text = "Keyword"
+        hdr[2].text = "Filename"
 
-def merge_audio_with_video(video_path, keyword, timestamp_label):
-    video = VideoFileClip(video_path)
-    audio_path = get_unused_audio(keyword)
-    if not audio_path:
-        print(f"❌ لم يتم دمج الفيديو {video_path} لأن الصوت غير متوفر.")
-        return
+    table = doc.tables[0]
+    row = table.add_row().cells
+    row[0].text = now
+    row[1].text = keyword
+    row[2].text = filename
 
-    matched_audio = match_audio_duration(audio_path, video.duration)
-    final = video.set_audio(matched_audio)
-    today = datetime.now().strftime("%Y-%m-%d")
-    out_name = f"{today}_{timestamp_label}.mp4"
-    out_path = OUTPUT_ROOT / keyword
-    out_path.mkdir(parents=True, exist_ok=True)
-    final.write_videofile(str(out_path / out_name), codec="libx264", audio_codec="aac")
-    print(f"✅ تم حفظ الفيديو: {out_path / out_name}")
+    doc.save(LOG_FILE)
 
-def choose_random_short_video():
-    random.shuffle(keywords)
-    for keyword in keywords:
-        video_dir = VIDEO_ROOT / keyword
-        video_dir.mkdir(parents=True, exist_ok=True)
+def process_video(video_path: Path, keyword: str):
+    print(f"🎬 Processing {video_path.name}")
+    output_path = OUTPUT_DIR / video_path.name
 
-        all_videos = [f for f in os.listdir(video_dir) if f.endswith(".mp4")]
-        short_videos = []
+    try:
+        clip = VideoFileClip(str(video_path))
+        if clip.audio is not None:
+            # الفيديو يحتوي على صوت → يُنقل كما هو
+            shutil.copy(str(video_path), str(output_path))
+            print(f"🔊 Video has audio, copied directly: {output_path.name}")
+        else:
+            # الفيديو صامت → دمجه مع الصوت
+            audio_file = AUDIO_DIR / f"{keyword}.mp3"
+            if not audio_file.exists():
+                print(f"❌ Audio not found for {keyword}, skipping...")
+                return
 
-        for v in all_videos:
-            try:
-                clip = VideoFileClip(str(video_dir / v))
-                if clip.duration <= 60:
-                    short_videos.append((str(video_dir / v), keyword))
-            except:
-                continue
+            audio = AudioFileClip(str(audio_file)).subclip(0, clip.duration)
+            clip = clip.set_audio(audio)
+            clip.write_videofile(str(output_path), codec="libx264", audio_codec="aac")
+            print(f"🔇 Video was silent, merged with audio: {output_path.name}")
 
-        if short_videos:
-            return random.choice(short_videos)
+        log_video(keyword, output_path.name)
+    except Exception as e:
+        print(f"❌ Error processing {video_path.name}: {e}")
 
-    return None, None
+def main():
+    for keyword_folder in VIDEOS_DIR.iterdir():
+        if keyword_folder.is_dir():
+            keyword = keyword_folder.name
+            for video_file in keyword_folder.glob("*.mp4"):
+                process_video(video_file, keyword)
 
-# تشغيل مهمّة الدمج اليومية
-video1, kw1 = choose_random_short_video()
-video2, kw2 = choose_random_short_video()
-
-if video1:
-    merge_audio_with_video(video1, kw1, "03PM")
-else:
-    print("❌ لم يتم العثور على فيديو قصير مناسب للفيديو 1")
-
-if video2:
-    merge_audio_with_video(video2, kw2, "09PM")
-else:
-    print("❌ لم يتم العثور على فيديو قصير مناسب للفيديو 2")
+if __name__ == "__main__":
+    main()
