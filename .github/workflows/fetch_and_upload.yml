@@ -1,52 +1,58 @@
-name: Fetch videos and audio
+name: Auto Upload Daily
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'       # ⏰ يوميًّا الساعة 7 صباحًا بتوقيت UTC
+  workflow_dispatch:           # 🚀 تشغيل يدوي عند الحاجة
 
 jobs:
-  fetch-videos:
+  run-script:
     runs-on: ubuntu-latest
 
-    # لا نبقي إلا SERVICE_ACCOUNT_KEY هنا
+    # نمرِّر هنا فقط مفتاح الخدمة (لإنشاء الملف)،
+    # أمّا بقية الأسرار فسنمرّرها صراحةً في الخطوة التي تحتاجها.
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-python@v4
-        with: { python-version: '3.10' }
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-      - name: Install deps
+      - name: 📦 Install dependencies
         run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Write service_account.key
+      # إنشاء ملف service_account.key عبر Python لضمان سلامة تنسيق JSON
+      - name: 🔑 Write service_account.key safely
         run: |
           python - << 'PY'
-import os, json, textwrap
+import os, json, pathlib
 key = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
-with open("service_account.key", "w") as f:
-    json.dump(key, f)
+pathlib.Path("service_account.key").write_text(json.dumps(key), encoding="utf-8")
 print("✅ service_account.key written")
 PY
 
-      # ⬇️⬇️ خطوة تشخيص المتغيّرات
-      - name: DEBUG –- show env vars
-        env:
-          PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: |
-          echo "PEXELS_API_KEY = '${PEXELS_API_KEY}'"
-          echo "PEXELS_API_KEY length = ${#PEXELS_API_KEY}"
-          echo "DRIVE_FOLDER_ID  = '${DRIVE_FOLDER_ID}'"
-          echo "DRIVE_FOLDER_ID length = ${#DRIVE_FOLDER_ID}"
-
-      # ⬇️⬇️ الخطوة الفعلية
-      - name: Run fetch-and-upload script
+      # تشغيل سكربت جلب الفيديوهات ورفعها مع تمرير المفاتيح المطلوبة
+      - name: 🎬 Run daily_fetch_and_upload.py
         env:
           PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
+
+      # توليد الريلز (دمج الصوت إذا كان صامتًا)
+      - name: 🛠️ Generate final reels
+        run: python daily_reels_generator.py
+
+      # توليد الكابتشنات وحفظها في captions.json
+      - name: 🧠 Generate captions
+        run: python generate_caption.py
+
+      # رفع captions.json إلى Google Drive داخل AutoUploader/captions/
+      - name: ☁️ Upload captions.json to Drive
+        run: python upload_captions_to_drive.py
