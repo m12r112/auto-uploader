@@ -42,3 +42,6 @@ jobs:
 
       - name: 🎬 Generate reels and upload
         run: python daily_reels_generator.py
+
+      - name: ☁️ Upload final reels to Google Drive
+        run: python upload_output_to_drive.py
