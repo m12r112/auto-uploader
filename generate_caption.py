@@ -1,45 +1,53 @@
-
 import os
-import openai
-import json
 from pathlib import Path
+from openai import OpenAI
 
-# تحميل المفتاح من متغير البيئة (GitHub Secrets)
-openai.api_key = os.environ["OPENAI_API_KEY"]
+# إعداد عميل OpenAI باستخدام المفتاح الموجود في المتغير البيئي
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-CAPTIONS_DIR = "captions"
-VIDEO_INFO = [
-    {"name": "2025-06-03_03PM.mp4", "keyword": "rain"},
-    {"name": "2025-06-03_09PM.mp4", "keyword": "fire"}
-]
+# المسارات
+OUTPUT_REELS_DIR = Path("output_reels")
+CAPTIONS_DIR = Path("captions")
 
+# قالب الطلب
 PROMPT_TEMPLATE = (
     "Generate a deep, emotionally resonant caption in English for an Instagram Reel about '{keyword}'. "
     "The caption should subtly influence the subconscious, evoke emotion, and encourage engagement "
     "(like, comment, follow) without being too obvious. Do not use hashtags. Keep it under 50 words."
 )
 
+# توليد الوصف من GPT
 def generate_caption(keyword):
     prompt = PROMPT_TEMPLATE.format(keyword=keyword)
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.8,
         max_tokens=100
     )
-    return response["choices"][0]["message"]["content"].strip()
+    return response.choices[0].message.content.strip()
 
-def save_caption(video_name, text):
-    os.makedirs(CAPTIONS_DIR, exist_ok=True)
-    txt_path = Path(CAPTIONS_DIR) / (Path(video_name).stem + ".txt")
-    with open(txt_path, "w", encoding="utf-8") as f:
-        f.write(text)
-    print(f"📝 Caption saved: {txt_path}")
+# معالجة جميع الفيديوهات تلقائيًا من المجلدات الفرعية
+def process_all_videos():
+    for keyword_folder in OUTPUT_REELS_DIR.iterdir():
+        if not keyword_folder.is_dir():
+            continue
 
-def main():
-    for video in VIDEO_INFO:
-        caption = generate_caption(video["keyword"])
-        save_caption(video["name"], caption)
+        keyword = keyword_folder.name
+        for video_file in keyword_folder.glob("*.mp4"):
+            video_name = video_file.name
+            caption = generate_caption(keyword)
 
+            # حفظ الوصف في مجلد captions/keyword/
+            out_dir = CAPTIONS_DIR / keyword
+            out_dir.mkdir(parents=True, exist_ok=True)
+            txt_path = out_dir / (Path(video_name).stem + ".txt")
+
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(caption)
+
+            print(f"✅ Caption saved: {txt_path}")
+
+# نقطة البداية
 if __name__ == "__main__":
-    main()
+    process_all_videos()
