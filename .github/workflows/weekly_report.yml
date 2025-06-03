@@ -1,0 +1,31 @@
+name: Weekly Report Sender
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # كل أحد الساعة 5 صباحًا بتوقيت بغداد (2 صباحًا UTC)
+  workflow_dispatch:  # يسمح بالتشغيل اليدوي أيضًا
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout repo
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install python-docx
+
+      - name: 📬 Run send_weekly_report.py
+        env:
+          EMAIL_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: |
+          echo "🔐 إعداد كلمة السر"
+          sed -i "s/APP_PASSWORD = .*/APP_PASSWORD = os.environ['EMAIL_PASSWORD']/" send_weekly_report.py
+          python send_weekly_report.py
