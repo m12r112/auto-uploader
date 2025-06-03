@@ -33,17 +33,22 @@ headers = {"Authorization": PEXELS_API_KEY}
 
 def fetch_video_url(keyword):
     print(f"🔍 [Pexels] Searching for '{keyword}'...")
-    params = {"query": keyword, "per_page": 10}
+    params = {"query": keyword, "per_page": 20}
     response = requests.get(PEXELS_API_URL, headers=headers, params=params)
     if response.status_code == 200:
         data = response.json()
+        valid_videos = []
         for video in data.get("videos", []):
             for file in video.get("video_files", []):
-                # تخفيف الفلترة: نقبل 720p فما فوق
-                if file.get("width") >= 720 and file.get("height") >= 720:
-                    print(f"🔗 Found URL for '{keyword}': {file['link']}")
-                    return file["link"]
-    print(f"❌ No suitable video found for '{keyword}'")
+                width = file.get("width")
+                height = file.get("height")
+                if width and height and height > width and height >= 720:
+                    valid_videos.append(file["link"])
+        if valid_videos:
+            selected_url = random.choice(valid_videos)
+            print(f"🔗 Found vertical video for '{keyword}': {selected_url}")
+            return selected_url
+    print(f"❌ No suitable vertical video found for '{keyword}'")
     return None
 
 def download_video(url, save_path):
