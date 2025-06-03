@@ -8,41 +8,47 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 
-# إعداد مجلدات التخزين محليًا
+# 1) إعداد مجلّدات التخزين محليًا
 VIDEO_ROOT = Path("videos")
 VIDEO_ROOT.mkdir(exist_ok=True)
 
-# تحميل الكلمات المفتاحية
+# 2) تحميل الكلمات المفتاحية
 with open("keywords.json") as f:
     keywords = json.load(f)["keywords"]
 
-# اختيار كلمتين عشوائيتين
+# 3) اختيار كلمتين عشوائيتين
 selected_keywords = random.sample(keywords, k=2)
 
-# قراءة المفاتيح من environment
+# 4) قراءة مفاتيح البيئة
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 if not PEXELS_API_KEY:
-    raise Exception("❌ PEXELS_API_KEY not found.")
+    raise Exception("❌ PEXELS_API_KEY not found in environment.")
 
 DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")
 if not DRIVE_FOLDER_ID:
-    raise Exception("❌ DRIVE_FOLDER_ID not found.")
+    raise Exception("❌ DRIVE_FOLDER_ID not found in environment.")
 
+# 5) بيئة Pexels
 PEXELS_API_URL = "https://api.pexels.com/videos/search"
 headers = {"Authorization": PEXELS_API_KEY}
 
 def fetch_video_url(keyword):
+    print(f"🔍 [Pexels] Searching for '{keyword}'...")
     params = {"query": keyword, "per_page": 5}
     response = requests.get(PEXELS_API_URL, headers=headers, params=params)
     if response.status_code == 200:
         data = response.json()
         for video in data.get("videos", []):
             for file in video.get("video_files", []):
+                # نأخذ الفيديو العرض 1080 والرأسي على الأقل 1080 وجودة "sd"
                 if file.get("width") == 1080 and file.get("height") >= 1080 and file.get("quality") == "sd":
+                    print(f"🔗 Found URL for '{keyword}': {file['link']}")
                     return file["link"]
+    print(f"❌ No suitable video found for '{keyword}'")
     return None
 
 def download_video(url, save_path):
+    print(f"⬇️ Downloading to {save_path} ...")
     r = requests.get(url, stream=True)
     with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
@@ -50,6 +56,8 @@ def download_video(url, save_path):
     print(f"✅ Downloaded: {save_path}")
 
 def get_or_create_folder(drive_service, parent_id, folder_name):
+    # 1) نبحث إذا كان هناك مجلّد فعلاً باسم folder_name داخل parent_id
+    print(f"🗂️ Checking for folder '{folder_name}' in parent '{parent_id}' ...")
     query = (
         f"mimeType='application/vnd.google-apps.folder' "
         f"and name='{folder_name}' "
@@ -57,23 +65,29 @@ def get_or_create_folder(drive_service, parent_id, folder_name):
         f"and trashed=false"
     )
     results = drive_service.files().list(
-        q=query,
-        spaces="drive",
-        fields="files(id, name)"
+        q=query, spaces="drive", fields="files(id, name)"
     ).execute()
     items = results.get("files", [])
     if items:
-        return items[0]["id"]
+        folder_id = items[0]["id"]
+        print(f"🔎 Found existing folder '{folder_name}' (ID = {folder_id})")
+        return folder_id
 
+    # 2) إذا لم نجده، ننشئه
+    print(f"➕ Folder '{folder_name}' not found. Creating it...")
     file_metadata = {
         "name": folder_name,
         "mimeType": "application/vnd.google-apps.folder",
         "parents": [parent_id]
     }
     folder = drive_service.files().create(body=file_metadata, fields="id").execute()
-    return folder.get("id")
+    new_id = folder.get("id")
+    print(f"✅ Created folder '{folder_name}' with ID = {new_id}")
+    return new_id
 
 def upload_to_drive(local_file_path, parent_folder_id, keyword):
+    print(f"☁️ Uploading '{local_file_path}' to Drive under keyword '{keyword}' ...")
+    # بناء الاعتماد بإستخدام service_account.key
     creds = service_account.Credentials.from_service_account_file(
         "service_account.key",
         scopes=["https://www.googleapis.com/auth/drive"]
@@ -81,10 +95,9 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
     drive_service = build("drive", "v3", credentials=creds)
 
     try:
-        # إنشاء أو جلب مجلد فرعي باسم الكلمة المفتاحية
         folder_id = get_or_create_folder(drive_service, parent_folder_id, keyword)
     except HttpError as e:
-        print(f"❌ Error creating/fetching folder '{keyword}': {e}")
+        print(f"❌ Error fetching/creating folder '{keyword}': {e}")
         return
 
     file_metadata = {
@@ -92,19 +105,22 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
         "parents": [folder_id]
     }
     media = MediaFileUpload(local_file_path, mimetype="video/mp4")
-    uploaded = drive_service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, name"
-    ).execute()
-    print(f"✅ Uploaded to Drive: {uploaded['name']} ({uploaded['id']}), in folder '{keyword}'")
+    try:
+        uploaded = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id, name"
+        ).execute()
+        print(f"✅ Uploaded to Drive: {uploaded['name']} (ID = {uploaded['id']}), in folder '{keyword}'")
+    except HttpError as e:
+        print(f"❌ Error uploading file '{local_file_path}': {e}")
 
 def main():
+    print(f"📁 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
     for keyword in selected_keywords:
-        print(f"🔍 Searching for: {keyword}")
+        print(f"\n🔍 Processing keyword: {keyword}")
         video_url = fetch_video_url(keyword)
         if not video_url:
-            print(f"❌ No video found for keyword: {keyword}")
             continue
 
         keyword_dir = VIDEO_ROOT / keyword
