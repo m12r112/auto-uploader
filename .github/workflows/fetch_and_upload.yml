@@ -1,19 +1,16 @@
-name: Auto Upload Daily
+name: Daily Auto Fetch and Upload
 
 on:
   schedule:
-    - cron: '0 7 * * *'  # ⏰ يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:
+    - cron: "0 5 * * *"  # يوميًا الساعة 5:00 صباحًا بتوقيت UTC (8:00 صباحًا بغداد)
+  workflow_dispatch:      # لتفعيل زر التشغيل اليدوي
 
 jobs:
-  run-script:
+  run-fetch-and-upload:
     runs-on: ubuntu-latest
 
-    env:
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-
     steps:
-      - name: 📥 Checkout repository
+      - name: ✅ Checkout repo
         uses: actions/checkout@v3
 
       - name: 🐍 Set up Python
@@ -22,30 +19,13 @@ jobs:
           python-version: '3.10'
 
       - name: 📦 Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: 🔑 Write service_account.key
-        run: |
-          python - << 'PY'
-import os, json, pathlib
-key = json.loads(os.environ["SERVICE_ACCOUNT_KEY"])
-pathlib.Path("service_account.key").write_text(json.dumps(key), encoding="utf-8")
-print("✅ service_account.key written")
-PY
-
-      - name: 🎬 Run daily_fetch_and_upload.py
+      - name: 🚀 Run fetch and upload script
         env:
-          PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python daily_fetch_and_upload.py
-
-      - name: 🛠️ Generate final reels
-        run: python daily_reels_generator.py
-
-      - name: 🧠 Generate captions
-        run: python generate_caption.py
-
-      - name: ☁️ Upload captions.json to Google Drive
-        run: python upload_captions_to_drive.py
