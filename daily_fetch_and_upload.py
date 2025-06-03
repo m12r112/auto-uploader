@@ -1,61 +1,63 @@
 import os
 import json
+import random
 import requests
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 
-TEMP_FOLDER = Path("temp_videos")
-TEMP_FOLDER.mkdir(exist_ok=True)
+# إعداد مجلدات التخزين
+VIDEO_ROOT = Path("videos")
+VIDEO_ROOT.mkdir(exist_ok=True)
 
-def setup_drive():
-    key_json = os.environ.get("SERVICE_ACCOUNT_KEY")
-    if not key_json:
-        raise Exception("❌ SERVICE_ACCOUNT_KEY not found. Did you forget to add it as a GitHub Secret?")
-    
-    with open("service_account.key", "w") as f:
-        f.write(key_json)
+# تحميل الكلمات المفتاحية
+with open("keywords.json") as f:
+    keywords = json.load(f)["keywords"]
 
-    with open("service_account.key", "r") as f:
-        key_data = json.load(f)
+# اختيار كلمتين عشوائيتين
+selected_keywords = random.sample(keywords, k=2)
 
-    credentials = service_account.Credentials.from_service_account_info(
-        key_data,
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-    return build("drive", "v3", credentials=credentials)
+# إعداد Pexels API
+PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+if not PEXELS_API_KEY:
+    raise Exception("❌ PEXELS_API_KEY not found in environment.")
 
-def download_video(url, filename):
-    print(f"⬇️ Downloading: {url}")
+PEXELS_API_URL = "https://api.pexels.com/videos/search"
+headers = {"Authorization": PEXELS_API_KEY}
+
+def fetch_video_url(keyword):
+    params = {"query": keyword, "per_page": 5}
+    response = requests.get(PEXELS_API_URL, headers=headers, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        for video in data.get("videos", []):
+            for file in video.get("video_files", []):
+                if file.get("width") == 1080 and file.get("height") >= 1080 and file.get("quality") == "sd":
+                    return file["link"]
+    return None
+
+def download_video(url, save_path):
     r = requests.get(url, stream=True)
-    with open(TEMP_FOLDER / filename, "wb") as f:
+    with open(save_path, "wb") as f:
         for chunk in r.iter_content(chunk_size=8192):
             f.write(chunk)
-    print(f"✅ Saved: {filename}")
-
-def upload_to_drive(service, file_path, folder_id=None):
-    file_metadata = {
-        'name': file_path.name,
-        'parents': [folder_id] if folder_id else []
-    }
-    media = MediaFileUpload(file_path, resumable=True)
-    uploaded = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields='id'
-    ).execute()
-    print(f"📤 Uploaded to Drive: {uploaded.get('id')}")
+    print(f"✅ Downloaded: {save_path}")
 
 def main():
-    drive_service = setup_drive()
-    
-    # مثال لرابط فيديو (غيّره حسب مشروعك)
-    video_url = "https://player.vimeo.com/external/441183813.sd.mp4?s=..."
-    filename = "sample.mp4"
+    for keyword in selected_keywords:
+        print(f"🔍 Searching for: {keyword}")
+        video_url = fetch_video_url(keyword)
+        if not video_url:
+            print(f"❌ No video found for keyword: {keyword}")
+            continue
 
-    download_video(video_url, filename)
-    upload_to_drive(drive_service, TEMP_FOLDER / filename)
+        keyword_dir = VIDEO_ROOT / keyword
+        keyword_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
+        save_path = keyword_dir / filename
+
+        download_video(video_url, save_path)
 
 if __name__ == "__main__":
     main()
