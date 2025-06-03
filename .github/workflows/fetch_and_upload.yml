@@ -3,15 +3,15 @@ name: Fetch videos and audio
 on:
   schedule:
     - cron: '0 7 * * *'  # يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:
+  workflow_dispatch:     # للإطلاق اليدوي عند الحاجة
 
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
+
+    # ندع هنا فقط المتغيّر الخاص بخدمة Google Drive (يُستخدم لإنشاء service_account.key)
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      # لن نضع PEXELS_API_KEY هنا كي لا يتداخل مع خطوة إعادة تعريف env الكاملة
-      DRIVE_FOLDER_ID:      ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
       - name: 📥 Checkout repository
@@ -37,8 +37,8 @@ with open("service_account.key","w") as f:
 PYCODE
 
       - name: 🎬 Run fetch-and-upload script
+        # هنا نعّرف كل ما يحتاجه السكربت: مفتاح Pexels وDRIVE_FOLDER_ID
         env:
-          # هنا نمرّر كل ما يحتاجه السكربت: مفتاح Pexels ومعرّف الـ Drive
           PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
