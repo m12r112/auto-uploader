@@ -6,147 +6,105 @@ from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from googleapiclient.errors import HttpError
 
-# ─────────────────────────────────────────────
-# 1) مجلد التخزين المحلي للفيديوهات
-# ─────────────────────────────────────────────
-VIDEO_ROOT = Path("videos")
-VIDEO_ROOT.mkdir(exist_ok=True)
+# 🛠 إعداد المتغيرات من GitHub Secrets
+PEXELS_API_KEY = os.environ["PEXELS_API_KEY"]
+SERVICE_ACCOUNT_KEY = os.environ["SERVICE_ACCOUNT_KEY"]
+DRIVE_FOLDER_ID = os.environ["DRIVE_FOLDER_ID"]
 
-# ─────────────────────────────────────────────
-# 2) تحميل الكلمات المفتاحية واختيار كلمتين عشوائيتين
-# ─────────────────────────────────────────────
-with open("keywords.json", encoding="utf-8") as f:
-    keywords = json.load(f)["keywords"]
-selected_keywords = random.sample(keywords, k=2)
+# 🔐 حفظ مفتاح الخدمة مؤقتًا
+with open("service_account.key", "w") as f:
+    f.write(SERVICE_ACCOUNT_KEY)
 
-# ─────────────────────────────────────────────
-# 3) مفاتيح البيئة الأساسية
-# ─────────────────────────────────────────────
-PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
-print(
-    f"🔐 DEBUG: PEXELS_API_KEY begins with: {PEXELS_API_KEY[:6]}..."
-    if PEXELS_API_KEY else
-    "❌ PEXELS_API_KEY not found in env"
+# 🧠 اختيار نوعين عشوائيين يوميًا
+with open("keywords.json") as f:
+    keywords = json.load(f)["keywords"]  # ✅ هذا هو التعديل لتوافق ملفك
+
+selected_keywords = random.sample(keywords, 2)
+
+# 📁 مجلد حفظ الفيديوهات
+videos_dir = Path("videos")
+videos_dir.mkdir(exist_ok=True)
+
+# 🔧 إعداد Google Drive API
+credentials = service_account.Credentials.from_service_account_file(
+    "service_account.key",
+    scopes=["https://www.googleapis.com/auth/drive"]
 )
-if not PEXELS_API_KEY:
-    raise Exception("❌ PEXELS_API_KEY not found in environment.")
+drive_service = build("drive", "v3", credentials=credentials)
 
-DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")
-if not DRIVE_FOLDER_ID:
-    raise Exception("❌ DRIVE_FOLDER_ID not found in environment.")
 
-# ─────────────────────────────────────────────
-# 4) إعداد Pexels API
-# ─────────────────────────────────────────────
-PEXELS_API_URL = "https://api.pexels.com/videos/search"
-headers = {"Authorization": PEXELS_API_KEY}
+def get_pexels_video(keyword):
+    headers = {"Authorization": PEXELS_API_KEY}
+    url = f"https://api.pexels.com/videos/search?query={keyword}&orientation=portrait&per_page=10"
+    res = requests.get(url, headers=headers)
+    res.raise_for_status()
+    data = res.json()
 
-def fetch_video_url(keyword: str) -> str | None:
-    """جلب رابط فيديو عمودي من Pexels، أو إرجاع None إذا لم يُعثر عليه."""
-    print(f"🔍 [Pexels] Searching for '{keyword}' …")
-    params = {"query": keyword, "per_page": 20}
-    try:
-        resp = requests.get(PEXELS_API_URL, headers=headers, params=params, timeout=20)
-        resp.raise_for_status()
-    except Exception as e:
-        print(f"❌ Pexels API error: {e}")
-        return None
-
-    data = resp.json()
-    candidates: list[str] = []
+    # 🔍 اختار فيديو بدقة 720p أو أعلى ومدته ≤ 60 ثانية
+    candidates = []
     for video in data.get("videos", []):
-        for file in video.get("video_files", []):
-            w, h = file.get("width"), file.get("height")
-            # شرط عمودي ≥ 720p
-            if w and h and h > w and h >= 720:
-                candidates.append(file["link"])
+        if video["duration"] <= 60:
+            for f in video["video_files"]:
+                if f["height"] >= 720 and f["width"] < f["height"]:  # عمودي
+                    candidates.append(f["link"])
+                    break
 
-    if candidates:
-        chosen = random.choice(candidates)
-        print(f"🔗 Selected vertical video: {chosen}")
-        return chosen
+    return random.choice(candidates) if candidates else None
 
-    print(f"❌ No vertical video found for '{keyword}'")
-    return None
 
-def download_video(url: str, save_path: Path) -> bool:
-    """تنزيل الفيديو إلى المسار المحدد."""
-    print(f"⬇️ Downloading → {save_path}")
-    try:
-        r = requests.get(url, stream=True, timeout=60)
-        r.raise_for_status()
-        with open(save_path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-        print(f"✅ Saved: {save_path.name}")
-        return True
-    except Exception as e:
-        print(f"❌ Download failed: {e}")
-        return False
+def upload_to_drive(filepath: Path, parent_folder_id: str, keyword: str):
+    # تحقق إن كان مجلد النوع موجودًا داخل Google Drive، وإن لم يكن فأنشئه
+    folder_name = keyword
+    folder_id = None
 
-# ─────────────────────────────────────────────
-# 5) أدوات Google Drive
-# ─────────────────────────────────────────────
-def get_or_create_folder(service, parent_id: str, name: str) -> str:
-    query = (
-        f"mimeType='application/vnd.google-apps.folder' "
-        f"and name='{name}' and '{parent_id}' in parents and trashed=false"
-    )
-    res = service.files().list(q=query, spaces="drive", fields="files(id,name)").execute()
-    if res.get("files"):
-        return res["files"][0]["id"]
+    query = f"'{parent_folder_id}' in parents and name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed = false"
+    response = drive_service.files().list(q=query, fields="files(id)").execute()
+    files = response.get("files", [])
+    if files:
+        folder_id = files[0]["id"]
+    else:
+        folder_metadata = {
+            "name": folder_name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_folder_id]
+        }
+        folder = drive_service.files().create(body=folder_metadata, fields="id").execute()
+        folder_id = folder["id"]
 
-    meta = {
-        "name": name,
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id],
+    file_metadata = {
+        "name": filepath.name,
+        "parents": [folder_id]
     }
-    created = service.files().create(body=meta, fields="id").execute()
-    return created["id"]
+    media = MediaFileUpload(str(filepath), resumable=True)
+    drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
-def upload_to_drive(local_path: Path, parent_id: str, keyword: str) -> None:
-    """رفع الملف إلى Google Drive داخل المسار المناسب."""
-    creds = service_account.Credentials.from_service_account_file(
-        "service_account.key",
-        scopes=["https://www.googleapis.com/auth/drive"],
-    )
-    service = build("drive", "v3", credentials=creds)
 
-    try:
-        videos_root = get_or_create_folder(service, parent_id, "Videos")
-        keyword_folder = get_or_create_folder(service, videos_root, keyword)
-    except HttpError as e:
-        print(f"❌ Folder creation error: {e}")
-        return
-
-    meta = {"name": local_path.name, "parents": [keyword_folder]}
-    media = MediaFileUpload(local_path, mimetype="video/mp4")
-    try:
-        uploaded = service.files().create(body=meta, media_body=media, fields="id").execute()
-        print(f"✅ Uploaded to Drive (ID={uploaded['id']}) → Videos/{keyword}/{local_path.name}")
-    except HttpError as e:
-        print(f"❌ Upload error: {e}")
-
-# ─────────────────────────────────────────────
-# 6) الحلقة الرئيسية
-# ─────────────────────────────────────────────
-def main() -> None:
-    print(f"📂 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
+def main():
     for keyword in selected_keywords:
-        print(f"\n🔍 Keyword: {keyword}")
-        url = fetch_video_url(keyword)
-        if not url:
+        print(f"[🔍 Pexels] Searching for '{keyword}' …")
+        link = get_pexels_video(keyword)
+        if not link:
+            print(f"[❌] No suitable video found for '{keyword}'")
             continue
 
-        keyword_dir = VIDEO_ROOT / keyword
-        keyword_dir.mkdir(parents=True, exist_ok=True)
-        fname = f"{keyword}_{random.randint(1000,9999)}.mp4"
-        save_to = keyword_dir / fname
+        # تحميل الفيديو
+        filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
+        save_to = videos_dir / keyword / filename
+        save_to.parent.mkdir(parents=True, exist_ok=True)
 
-        if download_video(url, save_to):
-            upload_to_drive(save_to, DRIVE_FOLDER_ID, keyword)
+        print(f"[⬇️] Downloading: {link}")
+        with requests.get(link, stream=True) as r:
+            r.raise_for_status()
+            with open(save_to, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        print(f"[✅] Saved: {save_to.name}")
+
+        # رفع الفيديو إلى Google Drive
+        upload_to_drive(save_to, DRIVE_FOLDER_ID, keyword)
+
 
 if __name__ == "__main__":
     main()
