@@ -3,17 +3,16 @@ name: Fetch videos and upload to Drive
 on:
   schedule:
     - cron: '0 5 * * *'   # يعمل يوميًا الساعة 5 صباحًا بتوقيت UTC
-  workflow_dispatch:      # لإمكانية التشغيل يدويًا من واجهة GitHub
+  workflow_dispatch:      # لتشغيله يدويًا من GitHub
 
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
 
-    # تمرير المتغيرات البيئية إلى السكربت
     env:
-      PEXELS_API_KEY:    ${{ secrets.PEXELS_API_KEY }}
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID:     ${{ secrets.DRIVE_FOLDER_ID }}
+      PEXELS_API_KEY:        ${{ secrets.PEXELS_API_KEY }}
+      SERVICE_ACCOUNT_KEY:   ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      DRIVE_FOLDER_ID:       ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
       - name: Checkout repository
@@ -31,7 +30,8 @@ jobs:
 
       - name: Write service_account.key file
         run: |
-          echo "${{ env.SERVICE_ACCOUNT_KEY }}" > service_account.key
+          printf '%s' "${SERVICE_ACCOUNT_KEY}" > service_account.key
+        shell: bash
 
       - name: Run daily fetch and upload script
         run: python daily_fetch_and_upload.py
