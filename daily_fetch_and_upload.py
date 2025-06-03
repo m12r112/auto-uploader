@@ -21,6 +21,7 @@ selected_keywords = random.sample(keywords, k=2)
 
 # قراءة المفاتيح من environment
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+print(f"🔐 DEBUG: PEXELS_API_KEY begins with: {PEXELS_API_KEY[:5] + '...'}" if PEXELS_API_KEY else "❌ No PEXELS_API_KEY in env")
 if not PEXELS_API_KEY:
     raise Exception("❌ PEXELS_API_KEY not found.")
 
@@ -99,7 +100,6 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
         keyword_folder_id = get_or_create_folder(drive_service, videos_root_id, keyword)
     except HttpError as e:
         print(f"❌ Error creating folders: {e}")
-        print(str(e))
         return
 
     file_metadata = {
@@ -117,7 +117,6 @@ def upload_to_drive(local_file_path, parent_folder_id, keyword):
         print(f"✅ Uploaded to Drive: {uploaded['name']} (ID: {uploaded['id']}) in folder '{keyword}'")
     except HttpError as e:
         print(f"❌ Error uploading file: {e}")
-        print(str(e))
 
 def main():
     print(f"📁 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
