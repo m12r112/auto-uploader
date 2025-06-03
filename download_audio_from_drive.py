@@ -1,77 +1,66 @@
 import os
 import io
-import random
+from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# إعداد الاتصال بـ Google Drive
-SERVICE_ACCOUNT_FILE = 'service_account.json'
-SCOPES = ['https://www.googleapis.com/auth/drive']
+# إعداد حساب الخدمة
+SERVICE_ACCOUNT_KEY = os.environ["SERVICE_ACCOUNT_KEY"]
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-drive_service = build('drive', 'v3', credentials=credentials)
+with open("service_account.key", "w") as f:
+    f.write(SERVICE_ACCOUNT_KEY)
 
-# المجلد المحلي المؤقت
-TEMP_LOCAL_DIR = "audio_temp"
+creds = service_account.Credentials.from_service_account_file(
+    "service_account.key",
+    scopes=["https://www.googleapis.com/auth/drive"]
+)
+drive_service = build("drive", "v3", credentials=creds)
 
-def get_folder_id(folder_name, parent_id=None):
-    """جلب ID لمجلد باسم معين (اختياريًا داخل مجلد أب)"""
-    query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder'"
+def get_folder_id_by_name(name, parent_id=None):
+    query = f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
     if parent_id:
         query += f" and '{parent_id}' in parents"
-    results = drive_service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-    folders = results.get('files', [])
-    return folders[0]['id'] if folders else None
+    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+    files = results.get("files", [])
+    return files[0]["id"] if files else None
 
-def download_first_audio(category):
-    """تحميل أول ملف mp3 من Google Drive داخل audio/{category}/"""
-    # مجلد الجذر AutoUploader > audio > category
-    root_id = get_folder_id("AutoUploader")
+def download_folder(folder_id, local_path):
+    Path(local_path).mkdir(parents=True, exist_ok=True)
+    results = drive_service.files().list(
+        q=f"'{folder_id}' in parents and trashed = false",
+        fields="files(id, name, mimeType)"
+    ).execute()
+    files = results.get("files", [])
+    for file in files:
+        file_path = os.path.join(local_path, file["name"])
+        if file["mimeType"] == "application/vnd.google-apps.folder":
+            download_folder(file["id"], file_path)
+        else:
+            request = drive_service.files().get_media(fileId=file["id"])
+            with open(file_path, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+            print(f"✅ Downloaded: {file_path}")
+
+def main():
+    print("🔍 Searching for 'AutoUploader'...")
+    root_id = get_folder_id_by_name("AutoUploader")
     if not root_id:
-        print("❌ لم يتم العثور على مجلد AutoUploader")
-        return None
+        print("❌ 'AutoUploader' folder not found.")
+        return
 
-    audio_id = get_folder_id("audio", parent_id=root_id)
-    if not audio_id:
-        print("❌ لم يتم العثور على مجلد audio داخل AutoUploader")
-        return None
+    print("🔍 Searching for 'audio_library' inside AutoUploader...")
+    audio_root_id = get_folder_id_by_name("audio_library", parent_id=root_id)
+    if not audio_root_id:
+        print("❌ 'audio_library' folder not found.")
+        return
 
-    category_id = get_folder_id(category, parent_id=audio_id)
-    if not category_id:
-        print(f"❌ لم يتم العثور على مجلد: {category}")
-        return None
+    print("⬇️ Downloading audio files to local 'audio_library/'...")
+    download_folder(audio_root_id, "audio_library")
+    print("✅ All audio files downloaded successfully.")
 
-    # جلب ملفات mp3 داخل المجلد
-    query = f"'{category_id}' in parents and mimeType != 'application/vnd.google-apps.folder' and name contains '.mp3'"
-    results = drive_service.files().list(q=query, spaces='drive', fields="files(id, name)").execute()
-    files = results.get('files', [])
-
-    if not files:
-        print(f"❌ لا يوجد ملفات mp3 في {category}")
-        return None
-
-    chosen_file = random.choice(files)
-    file_id = chosen_file['id']
-    file_name = chosen_file['name']
-
-    local_folder = os.path.join(TEMP_LOCAL_DIR, category)
-    os.makedirs(local_folder, exist_ok=True)
-    local_path = os.path.join(local_folder, file_name)
-
-    # تنزيل الملف
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.FileIO(local_path, 'wb')
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        status, done = downloader.next_chunk()
-
-    print(f"✅ تم تحميل الصوت: {local_path}")
-    return local_path
-
-# اختبار مباشر (يمكن حذفه في الإنتاج)
 if __name__ == "__main__":
-    for keyword in ["rain", "wind"]:
-        download_first_audio(keyword)
+    main()
