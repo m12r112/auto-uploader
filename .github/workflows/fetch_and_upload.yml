@@ -2,7 +2,7 @@ name: Auto Upload Daily
 
 on:
   schedule:
-    - cron: '0 7 * * *'       # ⏰ يوميًا الساعة 7 صباحًا بتوقيت UTC
+    - cron: '0 7 * * *'  # ⏰ يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
   workflow_dispatch:
 
 jobs:
@@ -41,10 +41,10 @@ PY
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
 
-      - name: 🛠️ Generate final reels (daily_reels_generator.py)
+      - name: 🛠️ Generate final reels
         run: python daily_reels_generator.py
 
-      - name: 🧠 Generate captions (generate_caption.py)
+      - name: 🧠 Generate captions
         run: python generate_caption.py
 
       - name: ☁️ Upload captions.json to Google Drive
