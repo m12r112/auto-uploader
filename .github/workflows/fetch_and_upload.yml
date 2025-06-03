@@ -2,15 +2,13 @@ name: Auto Upload Daily
 
 on:
   schedule:
-    - cron: '0 7 * * *'       # ⏰ يوميًّا الساعة 7 صباحًا بتوقيت UTC
-  workflow_dispatch:           # 🚀 تشغيل يدوي عند الحاجة
+    - cron: '0 7 * * *'       # ⏰ يوميًا الساعة 7 صباحًا بتوقيت UTC
+  workflow_dispatch:           # 🚀 تشغيل يدوي
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
 
-    # نمرِّر هنا فقط مفتاح الخدمة (لإنشاء الملف)،
-    # أمّا بقية الأسرار فسنمرّرها صراحةً في الخطوة التي تحتاجها.
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
@@ -28,8 +26,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # إنشاء ملف service_account.key عبر Python لضمان سلامة تنسيق JSON
-      - name: 🔑 Write service_account.key safely
+      - name: 🔑 Write service_account.key
         run: |
           python - << 'PY'
 import os, json, pathlib
@@ -38,21 +35,17 @@ pathlib.Path("service_account.key").write_text(json.dumps(key), encoding="utf-8"
 print("✅ service_account.key written")
 PY
 
-      # تشغيل سكربت جلب الفيديوهات ورفعها مع تمرير المفاتيح المطلوبة
       - name: 🎬 Run daily_fetch_and_upload.py
         env:
           PEXELS_API_KEY:  ${{ secrets.PEXELS_API_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: python daily_fetch_and_upload.py
 
-      # توليد الريلز (دمج الصوت إذا كان صامتًا)
-      - name: 🛠️ Generate final reels
+      - name: 🛠️ Generate final reels (daily_reels_generator.py)
         run: python daily_reels_generator.py
 
-      # توليد الكابتشنات وحفظها في captions.json
-      - name: 🧠 Generate captions
+      - name: 🧠 Generate captions (generate_caption.py)
         run: python generate_caption.py
 
-      # رفع captions.json إلى Google Drive داخل AutoUploader/captions/
-      - name: ☁️ Upload captions.json to Drive
+      - name: ☁️ Upload captions.json to Google Drive
         run: python upload_captions_to_drive.py
