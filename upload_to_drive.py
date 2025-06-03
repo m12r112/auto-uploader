@@ -12,7 +12,7 @@ def setup_drive():
     key_json = os.environ.get("SERVICE_ACCOUNT_KEY")
     if not key_json:
         raise Exception("❌ SERVICE_ACCOUNT_KEY not found in environment.")
-    
+
     key_data = json.loads(key_json)
     credentials = service_account.Credentials.from_service_account_info(
         key_data, scopes=["https://www.googleapis.com/auth/drive"]
@@ -27,7 +27,7 @@ def get_or_create_folder(service, folder_name, parent_id=None):
     files = results.get('files', [])
     if files:
         return files[0]['id']
-    
+
     file_metadata = {
         'name': folder_name,
         'mimeType': 'application/vnd.google-apps.folder'
