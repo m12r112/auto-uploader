@@ -25,7 +25,7 @@ jobs:
         run: python daily_fetch_and_upload.py
 
       - name: Generate Reels
-        run: python daily_reels_generator.py
+        run: python daily_reels_generator.py   # ✅ سكربت الدمج يعمل هنا
 
       - name: Generate Captions using GPT4Free
         run: python generate_caption.py
