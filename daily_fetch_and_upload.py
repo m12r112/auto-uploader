@@ -18,11 +18,11 @@ with open("service_account.key", "w") as f:
 
 # 🧠 اختيار نوعين عشوائيين يوميًا
 with open("keywords.json") as f:
-    keywords = json.load(f)["keywords"]  # ✅ هذا هو التعديل لتوافق ملفك
+    keywords = json.load(f)["keywords"]
 
 selected_keywords = random.sample(keywords, 2)
 
-# 📁 مجلد حفظ الفيديوهات
+# 📁 مجلد حفظ الفيديوهات محليًا
 videos_dir = Path("videos")
 videos_dir.mkdir(exist_ok=True)
 
@@ -41,40 +41,45 @@ def get_pexels_video(keyword):
     res.raise_for_status()
     data = res.json()
 
-    # 🔍 اختار فيديو بدقة 720p أو أعلى ومدته ≤ 60 ثانية
     candidates = []
     for video in data.get("videos", []):
         if video["duration"] <= 60:
             for f in video["video_files"]:
-                if f["height"] >= 720 and f["width"] < f["height"]:  # عمودي
+                if f["height"] >= 720 and f["width"] < f["height"]:
                     candidates.append(f["link"])
                     break
 
     return random.choice(candidates) if candidates else None
 
 
-def upload_to_drive(filepath: Path, parent_folder_id: str, keyword: str):
-    # تحقق إن كان مجلد النوع موجودًا داخل Google Drive، وإن لم يكن فأنشئه
-    folder_name = keyword
-    folder_id = None
-
-    query = f"'{parent_folder_id}' in parents and name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed = false"
-    response = drive_service.files().list(q=query, fields="files(id)").execute()
-    files = response.get("files", [])
+def get_or_create_folder(folder_name, parent_id):
+    """إنشاء مجلد على Google Drive داخل parent_id إذا لم يكن موجودًا"""
+    query = f"'{parent_id}' in parents and name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed = false"
+    res = drive_service.files().list(q=query, fields="files(id)").execute()
+    files = res.get("files", [])
     if files:
-        folder_id = files[0]["id"]
+        return files[0]["id"]
     else:
-        folder_metadata = {
+        metadata = {
             "name": folder_name,
             "mimeType": "application/vnd.google-apps.folder",
-            "parents": [parent_folder_id]
+            "parents": [parent_id]
         }
-        folder = drive_service.files().create(body=folder_metadata, fields="id").execute()
-        folder_id = folder["id"]
+        folder = drive_service.files().create(body=metadata, fields="id").execute()
+        return folder["id"]
 
+
+def upload_to_drive(filepath: Path, parent_folder_id: str, keyword: str):
+    # 🔁 تأكد أن مجلد Videos موجود داخل AutoUploader
+    videos_root_id = get_or_create_folder("Videos", parent_folder_id)
+
+    # 🔁 تأكد أن مجلد النوع موجود داخل Videos
+    keyword_folder_id = get_or_create_folder(keyword, videos_root_id)
+
+    # ⬆️ رفع الملف إلى مجلد النوع
     file_metadata = {
         "name": filepath.name,
-        "parents": [folder_id]
+        "parents": [keyword_folder_id]
     }
     media = MediaFileUpload(str(filepath), resumable=True)
     drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
@@ -88,7 +93,6 @@ def main():
             print(f"[❌] No suitable video found for '{keyword}'")
             continue
 
-        # تحميل الفيديو
         filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
         save_to = videos_dir / keyword / filename
         save_to.parent.mkdir(parents=True, exist_ok=True)
@@ -101,8 +105,6 @@ def main():
                     f.write(chunk)
 
         print(f"[✅] Saved: {save_to.name}")
-
-        # رفع الفيديو إلى Google Drive
         upload_to_drive(save_to, DRIVE_FOLDER_ID, keyword)
 
 
