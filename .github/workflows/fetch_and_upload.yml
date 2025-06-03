@@ -1,37 +1,41 @@
-name: Fetch videos and upload to Drive
+name: Fetch videos and audio
 
 on:
   schedule:
-    - cron: '0 5 * * *'   # يعمل يوميًا الساعة 5 صباحًا بتوقيت UTC
-  workflow_dispatch:      # لتشغيله يدويًا من GitHub
+    - cron: '0 7 * * *'  # ⏰ يعمل يوميًا الساعة 7 صباحًا بتوقيت UTC
+  workflow_dispatch:     # 🚀 لتشغيله يدويًا من GitHub
 
 jobs:
   fetch-videos:
     runs-on: ubuntu-latest
-
     env:
-      PEXELS_API_KEY:        ${{ secrets.PEXELS_API_KEY }}
-      SERVICE_ACCOUNT_KEY:   ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID:       ${{ secrets.DRIVE_FOLDER_ID }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
     steps:
-      - name: Checkout repository
+      - name: 📦 Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+      - name: 📥 Install dependencies
+        run: pip install -r requirements.txt
 
-      - name: Write service_account.key file
-        run: |
-          printf '%s' "${SERVICE_ACCOUNT_KEY}" > service_account.key
-        shell: bash
+      - name: 📝 Write service_account.key file
+        run: echo "${{ secrets.SERVICE_ACCOUNT_KEY }}" > service_account.key
 
-      - name: Run daily fetch and upload script
+      - name: 📹 Run daily fetch and upload script
         run: python daily_fetch_and_upload.py
+
+      - name: 🎞️ Generate final reels with audio
+        run: python daily_reels_generator.py
+
+      - name: 🧠 Generate captions using GPT
+        run: python generate_caption.py
+
+      - name: ☁️ Upload captions.json to Google Drive
+        run: python upload_captions_to_drive.py
