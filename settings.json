@@ -1,4 +1,5 @@
 {
   "local_temp_folder": "temp_videos",
-  "main_drive_folder": "YOUR_GOOGLE_DRIVE_FOLDER_ID"
+  "main_drive_folder": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+  "report_email": "mm2677078@gmail.com"
 }
