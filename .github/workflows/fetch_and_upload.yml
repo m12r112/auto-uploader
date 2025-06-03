@@ -23,18 +23,24 @@ jobs:
 
       - name: Fetch videos and audio
         run: python daily_fetch_and_upload.py
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
       - name: Generate Reels
-        run: python daily_reels_generator.py   # ✅ سكربت الدمج يعمل هنا
+        run: python daily_reels_generator.py
 
       - name: Generate Captions using GPT4Free
         run: python generate_caption.py
 
       - name: Upload to Google Drive
         run: python upload_to_drive.py
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
 
       - name: Send weekly report
         run: python send_weekly_report.py
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
       - name: Clean up local videos
         run: python cleanup_local.py
