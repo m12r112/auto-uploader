@@ -2,27 +2,31 @@ name: Auto Upload Daily
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # كل يوم الساعة 9 صباحًا UTC
+    - cron: '0 9 * * *'  # كل يوم الساعة 9 صباحًا UTC (يعني 12 ظهرًا بغداد)
   workflow_dispatch:      # لتشغيله يدويًا عند الحاجة
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
     env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
     steps:
-    - name: Checkout repository
+    - name: ✅ Checkout repository
       uses: actions/checkout@v3
 
-    - name: Setup Python
+    - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: Install dependencies
+    - name: 📦 Install dependencies
       run: |
         pip install -r requirements.txt
 
-    - name: Run script
+    - name: 🚀 Run script
       run: python daily_fetch_and_upload.py
