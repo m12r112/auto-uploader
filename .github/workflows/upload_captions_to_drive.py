@@ -34,7 +34,7 @@ def get_or_create_folder(name, parent_id=None):
     if parent_id:
         query += f" and '{parent_id}' in parents"
     results = drive_service.files().list(q=query, spaces="drive", fields="files(id, name)").execute()
-    folders = results.get("files", [])
+    folders = results.get('files', [])
     if folders:
         return folders[0]['id']
 
