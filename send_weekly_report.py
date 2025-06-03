@@ -1,4 +1,3 @@
-
 import smtplib
 import os
 import json
@@ -62,12 +61,13 @@ def send_email_report():
     msg["Subject"] = f"📊 Weekly AutoUploader Report – {today}"
     msg["From"] = FROM_EMAIL
     msg["To"] = TO_EMAIL
-    msg.set_content("Hello Mohammed,
+    msg.set_content("""Hello Mohammed,
 
 Attached is your weekly AutoUploader report showing all videos uploaded in the past 7 days.
 
 Best regards,
-AutoUploader Bot 🤖")
+AutoUploader Bot 🤖
+""")
 
     with open(report_name, "rb") as f:
         file_data = f.read()
