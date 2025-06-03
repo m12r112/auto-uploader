@@ -8,170 +8,145 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 
-# 1) إعداد مجلد محلي لحفظ الفيديوهات
+# ─────────────────────────────────────────────
+# 1) مجلد التخزين المحلي للفيديوهات
+# ─────────────────────────────────────────────
 VIDEO_ROOT = Path("videos")
 VIDEO_ROOT.mkdir(exist_ok=True)
 
-# 2) تحميل الكلمات المفتاحية
-with open("keywords.json") as f:
+# ─────────────────────────────────────────────
+# 2) تحميل الكلمات المفتاحية واختيار كلمتين عشوائيتين
+# ─────────────────────────────────────────────
+with open("keywords.json", encoding="utf-8") as f:
     keywords = json.load(f)["keywords"]
-
-# 3) اختيار كلمتين عشوائيتين
 selected_keywords = random.sample(keywords, k=2)
 
-# 4) قراءة مفتاح Pexels من environment
+# ─────────────────────────────────────────────
+# 3) مفاتيح البيئة الأساسية
+# ─────────────────────────────────────────────
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+print(
+    f"🔐 DEBUG: PEXELS_API_KEY begins with: {PEXELS_API_KEY[:6]}..."
+    if PEXELS_API_KEY else
+    "❌ PEXELS_API_KEY not found in env"
+)
 if not PEXELS_API_KEY:
-    # بدلًا من رفع استثناء قاتل، نطبع تحذير ونستمر (حتى لو لم نجد المفتاح)
-    print("⚠️ WARNING: PEXELS_API_KEY not found in env. Skipping Pexels API.")
-else:
-    print(f"🔐 PEXELS_API_KEY found (starts with): {PEXELS_API_KEY[:6]}...")
+    raise Exception("❌ PEXELS_API_KEY not found in environment.")
 
-# 5) معرّف مجلد Google Drive
 DRIVE_FOLDER_ID = os.environ.get("DRIVE_FOLDER_ID")
 if not DRIVE_FOLDER_ID:
-    raise Exception("❌ DRIVE_FOLDER_ID not found.")
+    raise Exception("❌ DRIVE_FOLDER_ID not found in environment.")
 
-# 6) رابط البحث في Pexels
+# ─────────────────────────────────────────────
+# 4) إعداد Pexels API
+# ─────────────────────────────────────────────
 PEXELS_API_URL = "https://api.pexels.com/videos/search"
-headers = {"Authorization": PEXELS_API_KEY} if PEXELS_API_KEY else {}
+headers = {"Authorization": PEXELS_API_KEY}
 
-def fetch_video_url(keyword):
-    """
-    محاولة جلب فيديو من Pexels؛ 
-    إذا لم يوجد PEXELS_API_KEY، نعيد None لنتيح لسكربت الرفع أن يأخذ رابط ثابت أو يتخطّى.
-    """
-    if not PEXELS_API_KEY:
-        return None
-
-    print(f"🔍 [Pexels] Searching for '{keyword}'...")
+def fetch_video_url(keyword: str) -> str | None:
+    """جلب رابط فيديو عمودي من Pexels، أو إرجاع None إذا لم يُعثر عليه."""
+    print(f"🔍 [Pexels] Searching for '{keyword}' …")
     params = {"query": keyword, "per_page": 20}
     try:
-        response = requests.get(PEXELS_API_URL, headers=headers, params=params, timeout=20)
-        response.raise_for_status()
+        resp = requests.get(PEXELS_API_URL, headers=headers, params=params, timeout=20)
+        resp.raise_for_status()
     except Exception as e:
-        print(f"❌ Error calling Pexels API: {e}")
+        print(f"❌ Pexels API error: {e}")
         return None
 
-    data = response.json()
-    candidates = []
+    data = resp.json()
+    candidates: list[str] = []
     for video in data.get("videos", []):
         for file in video.get("video_files", []):
-            width = file.get("width")
-            height = file.get("height")
-            # نختار الفيديو العمودي 720p+
-            if width and height and height > width and height >= 720:
+            w, h = file.get("width"), file.get("height")
+            # شرط عمودي ≥ 720p
+            if w and h and h > w and h >= 720:
                 candidates.append(file["link"])
-    if candidates:
-        selected = random.choice(candidates)
-        print(f"🔗 Selected vertical video: {selected}")
-        return selected
 
-    print(f"❌ No vertical video found for keyword: {keyword}")
+    if candidates:
+        chosen = random.choice(candidates)
+        print(f"🔗 Selected vertical video: {chosen}")
+        return chosen
+
+    print(f"❌ No vertical video found for '{keyword}'")
     return None
 
-def download_video(url, save_path):
-    """
-    نحاول تنزيل الفيديو من أي رابط (Pexels أو Vimeo أو غيره).
-    """
-    print(f"⬇️ Downloading to {save_path} ...")
+def download_video(url: str, save_path: Path) -> bool:
+    """تنزيل الفيديو إلى المسار المحدد."""
+    print(f"⬇️ Downloading → {save_path}")
     try:
         r = requests.get(url, stream=True, timeout=60)
         r.raise_for_status()
         with open(save_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
-        print(f"✅ Downloaded: {save_path}")
+        print(f"✅ Saved: {save_path.name}")
         return True
     except Exception as e:
-        print(f"❌ Failed to download {url}: {e}")
+        print(f"❌ Download failed: {e}")
         return False
 
-def get_or_create_folder(drive_service, parent_id, folder_name):
-    """
-    تأكد من وجود المجلد الفرعي داخل Drive؛ إذا لم يكن موجودًا، أنشئه.
-    """
+# ─────────────────────────────────────────────
+# 5) أدوات Google Drive
+# ─────────────────────────────────────────────
+def get_or_create_folder(service, parent_id: str, name: str) -> str:
     query = (
         f"mimeType='application/vnd.google-apps.folder' "
-        f"and name='{folder_name}' "
-        f"and '{parent_id}' in parents "
-        f"and trashed=false"
+        f"and name='{name}' and '{parent_id}' in parents and trashed=false"
     )
-    results = drive_service.files().list(
-        q=query,
-        spaces="drive",
-        fields="files(id, name)"
-    ).execute()
-    items = results.get("files", [])
-    if items:
-        return items[0]["id"]
+    res = service.files().list(q=query, spaces="drive", fields="files(id,name)").execute()
+    if res.get("files"):
+        return res["files"][0]["id"]
 
-    file_metadata = {
-        "name": folder_name,
+    meta = {
+        "name": name,
         "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id]
+        "parents": [parent_id],
     }
-    folder = drive_service.files().create(body=file_metadata, fields="id").execute()
-    return folder.get("id")
+    created = service.files().create(body=meta, fields="id").execute()
+    return created["id"]
 
-def upload_to_drive(local_file_path, parent_folder_id, keyword):
-    """
-    يرفع الفيديو إلى Google Drive داخل هيكل:
-    AutoUploader / Videos / {keyword} / {filename}
-    """
-    print(f"☁️ Uploading '{local_file_path}' under keyword '{keyword}' ...")
+def upload_to_drive(local_path: Path, parent_id: str, keyword: str) -> None:
+    """رفع الملف إلى Google Drive داخل المسار المناسب."""
+    creds = service_account.Credentials.from_service_account_file(
+        "service_account.key",
+        scopes=["https://www.googleapis.com/auth/drive"],
+    )
+    service = build("drive", "v3", credentials=creds)
+
     try:
-        creds = service_account.Credentials.from_service_account_file(
-            "service_account.key",
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
-    except Exception as e:
-        print(f"❌ Couldn't load service_account.key: {e}")
+        videos_root = get_or_create_folder(service, parent_id, "Videos")
+        keyword_folder = get_or_create_folder(service, videos_root, keyword)
+    except HttpError as e:
+        print(f"❌ Folder creation error: {e}")
         return
 
-    drive_service = build("drive", "v3", credentials=creds)
-
+    meta = {"name": local_path.name, "parents": [keyword_folder]}
+    media = MediaFileUpload(local_path, mimetype="video/mp4")
     try:
-        videos_root_id = get_or_create_folder(drive_service, parent_folder_id, "Videos")
-        keyword_folder_id = get_or_create_folder(drive_service, videos_root_id, keyword)
+        uploaded = service.files().create(body=meta, media_body=media, fields="id").execute()
+        print(f"✅ Uploaded to Drive (ID={uploaded['id']}) → Videos/{keyword}/{local_path.name}")
     except HttpError as e:
-        print(f"❌ Error creating/fetching folder: {e}")
-        return
+        print(f"❌ Upload error: {e}")
 
-    file_metadata = {
-        "name": os.path.basename(local_file_path),
-        "parents": [keyword_folder_id]
-    }
-    media = MediaFileUpload(local_file_path, mimetype="video/mp4")
-    try:
-        uploaded = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id, name"
-        ).execute()
-        print(f"✅ Uploaded to Drive: {uploaded['name']} (ID: {uploaded['id']}) in '{keyword}'")
-    except HttpError as e:
-        print(f"❌ Error uploading file: {e}")
-
-def main():
-    print(f"📁 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
+# ─────────────────────────────────────────────
+# 6) الحلقة الرئيسية
+# ─────────────────────────────────────────────
+def main() -> None:
+    print(f"📂 Parent Drive folder ID = {DRIVE_FOLDER_ID}")
     for keyword in selected_keywords:
-        print(f"\n🔍 Searching for: {keyword}")
-        video_url = fetch_video_url(keyword)
+        print(f"\n🔍 Keyword: {keyword}")
+        url = fetch_video_url(keyword)
+        if not url:
+            continue
 
-        # إذا لم يُوجد PEXELS_API_KEY أو لم يجد فيديو من Pexels، نستخدم رابط Vimeo الثابتُّ أدناه
-        if not video_url:
-            print(f"⚠️ Using fallback Vimeo URL for '{keyword}'.")
-            video_url = "https://player.vimeo.com/external/411138813.sd.mp4?s=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&profile_id=165&oauth2_token_id=xxxxxxxxxxxx"
-
-        # نحمّل الفيديو
-        filename = f"{keyword}_{random.randint(1000,9999)}.mp4"
         keyword_dir = VIDEO_ROOT / keyword
         keyword_dir.mkdir(parents=True, exist_ok=True)
-        save_path = keyword_dir / filename
+        fname = f"{keyword}_{random.randint(1000,9999)}.mp4"
+        save_to = keyword_dir / fname
 
-        if download_video(video_url, save_path):
-            upload_to_drive(str(save_path), DRIVE_FOLDER_ID, keyword)
+        if download_video(url, save_to):
+            upload_to_drive(save_to, DRIVE_FOLDER_ID, keyword)
 
 if __name__ == "__main__":
     main()
