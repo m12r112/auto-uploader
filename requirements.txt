@@ -4,6 +4,7 @@ python-docx
 beautifulsoup4
 google-auth
 google-auth-oauthlib
+google-auth-httplib2
 google-api-python-client
 moviepy==1.0.3
 imageio[ffmpeg]
