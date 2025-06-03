@@ -31,11 +31,11 @@ jobs:
       - name: 📥 Download videos from Google Drive
         run: python download_videos_from_drive.py
 
-      - name: 🎵 Download audio from Google Drive
+      - name: 🔊 Download audio library from Google Drive
         run: python download_audio_from_drive.py
 
-      - name: 🎬 Run daily reels generator (no merging)
+      - name: 🎬 Run daily reels generator
         run: python daily_reels_generator.py
 
-      - name: ☁️ Upload output reels to Drive
-        run: python upload_output_to_drive.py
+      - name: 📝 Generate captions using GPT4Free
+        run: python generate_caption.py
