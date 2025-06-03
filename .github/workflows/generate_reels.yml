@@ -2,30 +2,24 @@ name: Generate and Upload Reels
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # ⏰ يوميًا الساعة 6 صباحًا بتوقيت بغداد
-  workflow_dispatch:      # ⚡ لتفعيل زر التشغيل اليدوي
+    - cron: '0 3 * * *'  # ⏰ يوميًا الساعة 6 صباحًا بتوقيت بغداد (UTC+3)
+  workflow_dispatch:     # ⚡ للتشغيل اليدوي عند الحاجة
 
 jobs:
   generate-reels:
     runs-on: ubuntu-latest
-
     env:
       SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
 
     steps:
-      - name: ✅ Clone repository
+      - name: ⬇️ Clone repository
         uses: actions/checkout@v3
 
       - name: 🐍 Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: 🔧 Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: 📦 Install dependencies
         run: |
@@ -34,14 +28,14 @@ jobs:
       - name: 🔑 Write service account key
         run: echo "$SERVICE_ACCOUNT_KEY" > service_account.key
 
-      - name: ⬇️ Download videos from Google Drive
+      - name: 📥 Download videos from Google Drive
         run: python download_videos_from_drive.py
 
       - name: 🎵 Download audio from Google Drive
         run: python download_audio_from_drive.py
 
-      - name: 🎬 Generate reels and upload
+      - name: 🎬 Run daily reels generator (no merging)
         run: python daily_reels_generator.py
 
-      - name: ☁️ Upload final reels to Google Drive
+      - name: ☁️ Upload output reels to Drive
         run: python upload_output_to_drive.py
