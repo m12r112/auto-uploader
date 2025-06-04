@@ -39,3 +39,6 @@ jobs:
 
       - name: 📝 Generate captions using GPT4Free
         run: python generate_caption.py
+
+      - name: ☁️ Upload final reels to Google Drive
+        run: python upload_to_drive.py
