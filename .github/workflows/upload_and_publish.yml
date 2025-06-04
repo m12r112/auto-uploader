@@ -2,7 +2,7 @@ name: 🚀 Upload & Publish Instagram Reel
 
 on:
   schedule:
-    - cron: '30 12 * * *'  # يوميًا الساعة 3:30 مساءً بتوقيت بغداد
+    - cron: '30 12 * * *'  # 3:30 مساءً بتوقيت بغداد
   workflow_dispatch:
 
 jobs:
@@ -13,10 +13,10 @@ jobs:
     - name: 🧾 Checkout Repository
       uses: actions/checkout@v3
 
-    - name: 🛑 Check if there are videos in final_reels
+    - name: 🛑 Check if there are videos
       run: |
         if ! ls final_reels/*.mp4 1> /dev/null 2>&1; then
-          echo "❌ لا يوجد أي فيديو في final_reels/"
+          echo "❌ لا يوجد فيديو للنشر."
           exit 0
         fi
 
@@ -25,16 +25,19 @@ jobs:
       with:
         python-version: '3.10'
 
-    - name: 📦 Install Python Dependencies
-      run: pip install google-api-python-client google-auth google-auth-oauthlib moviepy python-docx
+    - name: 📦 Install dependencies
+      run: pip install google-api-python-client google-auth google-auth-oauthlib python-docx moviepy
 
     - name: 🔼 Upload Video to Google Drive
       id: upload
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: |
-        url=$(python upload_to_drive.py | grep "https://drive.google.com/uc?id=" | tail -n1 | awk '{print $NF}')
-        echo "video_url=$url" >> $GITHUB_OUTPUT
+        result=$(python upload_to_drive.py | grep "https://drive.google.com/uc?id=" | tail -n1)
+        video_url=$(echo $result | cut -d "|" -f1)
+        file_id=$(echo $result | cut -d "|" -f2)
+        echo "video_url=$video_url" >> $GITHUB_OUTPUT
+        echo "file_id=$file_id" >> $GITHUB_OUTPUT
 
     - name: 📤 Publish Reel to Instagram
       env:
@@ -42,5 +45,7 @@ jobs:
         IG_USER_ID: ${{ secrets.IG_USER_ID }}
         FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
         VIDEO_PUBLIC_URL: ${{ steps.upload.outputs.video_url }}
+        DRIVE_FILE_ID: ${{ steps.upload.outputs.file_id }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: |
         python publish_reels.py
