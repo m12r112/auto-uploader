@@ -1,44 +1,38 @@
 from pathlib import Path
 import os
 import json
-import requests
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from moviepy.editor import VideoFileClip, AudioFileClip
 import random
+from googleapiclient import discovery
+from google.oauth2 import service_account
+from moviepy.editor import VideoFileClip, AudioFileClip
 
-# ✅ قراءة التوكن من الملف الذي يتم تحديثه تلقائيًا
+# 🟩 قراءة التوكن المحدّث من الملف الذي أنشأه refresh_token.py
 INSTAGRAM_ACCESS_TOKEN = Path("latest_token.txt").read_text().strip()
 
-# إعدادات المسارات
 with open("settings.json") as f:
     settings = json.load(f)
 
-FINAL_REELS_DIR = settings["final_reels_dir"]
-LOG_FILE = settings["published_log_file"]
+FINAL_REELS = Path(settings["final_reels_dir"])
+LOG_FILE = Path(settings["uploaded_log_file"])
 
-def read_uploaded_videos():
+def not_already_uploaded(file):
     if not os.path.exists(LOG_FILE):
-        return []
+        return True
     with open(LOG_FILE, "r", encoding="utf-8") as f:
-        return f.read().splitlines()
+        return file not in f.read()
 
 def upload_to_instagram(video_path):
-    print(f"⬆️ جاري رفع الفيديو: {video_path}")
-    print(f"🔐 باستخدام التوكن: {INSTAGRAM_ACCESS_TOKEN[:10]}...")
-
-    # يمكنك هنا كتابة كود رفع الفيديو إلى Instagram Graph API باستخدام requests
+    print("✅ سيتم رفع الفيديو:", video_path)
+    print("🔑 التوكن المستخدم:", INSTAGRAM_ACCESS_TOKEN[:10], "...")
+    # هنا تضع كود رفع الفيديو إلى Instagram Graph API لاحقًا
 
 def main():
-    uploaded = set(read_uploaded_videos())
-
-    for file in os.listdir(FINAL_REELS_DIR):
-        if file.endswith(".mp4") and file not in uploaded:
-            full_path = os.path.join(FINAL_REELS_DIR, file)
-            upload_to_instagram(full_path)
+    for file in os.listdir(FINAL_REELS):
+        if file.endswith(".mp4") and not_already_uploaded(file):
+            video_path = FINAL_REELS / file
+            upload_to_instagram(video_path)
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(file + "\n")
-            break
 
 if __name__ == "__main__":
     main()
