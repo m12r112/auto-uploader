@@ -1,15 +1,15 @@
-name: Generate Daily Reels
+name: Generate Reels and Post to Instagram
 
 on:
   schedule:
-    - cron: '0 5 * * *'  # كل يوم الساعة 5 صباحًا بتوقيت بغداد
-  workflow_dispatch:
+    - cron: '0 6 * * *'  # كل يوم الساعة 6 صباحًا
+  workflow_dispatch:     # إمكانية التشغيل اليدوي
 
 jobs:
-  generate:
+  generate-and-post:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repo
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -17,47 +17,16 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: Fetch Pexels Videos
-        run: |
-          python scripts/daily_fetch_and_upload.py
-        env:
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-
-      - name: Generate Reels
+      - name: Run daily reels generator
         run: |
           python scripts/daily_reels_generator.py
-
-      - name: Generate Captions
-        run: |
-          python scripts/generate_caption.py
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
 
-      - name: Upload to Drive
+      - name: Upload captions to drive
         run: |
-          python scripts/upload_to_drive.py
-        env:
-          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-
-      - name: Send Weekly Report
-        if: github.event.schedule == '0 5 * * 7'
-        run: |
-          python scripts/send_weekly_report.py
-        env:
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          EMAIL_TO: mm2677078@gmail.com
-
-      - name: Auto Refresh Instagram Token
-        run: |
-          python scripts/refresh_token.py
-        env:
-          FB_APP_ID: ${{ secrets.FB_APP_ID }}
-          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
-          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+          python upload_captions_to_drive.py
