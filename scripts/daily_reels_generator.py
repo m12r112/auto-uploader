@@ -1,89 +1,99 @@
 import os
 import random
 from pathlib import Path
-from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_audioclips
-from shutil import copy2
+from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
 from docx import Document
+from datetime import datetime
+import shutil
 
-# 🗂️ إعداد المسارات
 VIDEOS_DIR = Path("videos")
 AUDIO_DIR = Path("audio_library")
 OUTPUT_DIR = Path("final_reels")
 LOG_FILE = Path("Published_Videos_Log.docx")
 
-# 🔑 تحميل التوكن من المتغير البيئي
-access_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN", "")
-if not access_token:
-    print("⚠️ لم يتم العثور على توكن Instagram. سيتم تخطي النشر.")
-
-# 🧠 تحميل السجل الحالي لتجنب التكرار
-if LOG_FILE.exists():
-    doc = Document(LOG_FILE)
-    published = [p.text for p in doc.paragraphs]
-else:
+OUTPUT_DIR.mkdir(exist_ok=True)
+if not LOG_FILE.exists():
     doc = Document()
-    published = []
+    doc.add_heading("Published Videos Log", 0)
+    doc.save(LOG_FILE)
 
-# 🧪 اختيار فيديوهين فقط من مجلدات مختلفة
-all_videos = list(VIDEOS_DIR.rglob("*.mp4"))
-random.shuffle(all_videos)
-selected = []
-
-for video_path in all_videos:
-    if len(selected) >= 2:
-        break
-    if str(video_path) in published:
-        continue
-
+def is_video_with_audio(path):
     try:
-        clip = VideoFileClip(str(video_path))
-        if clip.w < clip.h and clip.duration <= 60 and clip.fps >= 24:
-            selected.append((video_path, clip))
-    except Exception as e:
-        print(f"❌ خطأ في فتح الفيديو {video_path}: {e}")
+        clip = VideoFileClip(str(path))
+        has_audio = clip.audio is not None
+        clip.close()
+        return has_audio
+    except:
+        return False
 
-# 🧩 معالجة الفيديوهات
-for video_path, clip in selected:
-    keyword = video_path.parent.name
-    has_audio = clip.audio is not None
+def select_unused_audio(audio_folder, used_list):
+    all_audio = list(audio_folder.glob("*.mp3"))
+    unused = [a for a in all_audio if a.name not in used_list]
+    if not unused:
+        used_list.clear()
+        unused = all_audio
+    return random.choice(unused) if unused else None
 
-    output_path = OUTPUT_DIR / video_path.name
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def load_used_audios(log_path):
+    if not log_path.exists():
+        return set()
+    doc = Document(log_path)
+    return {p.text.split(" | ")[-1] for p in doc.paragraphs if "Audio:" in p.text}
 
-    if has_audio:
-        # ✅ يحتوي على صوت: يُنسخ فقط
-        copy2(video_path, output_path)
-        print(f"✅ تم نسخ الفيديو {video_path.name} كما هو.")
-    else:
-        # 🔇 لا يحتوي على صوت: دمج مع صوت مناسب
-        audio_folder = AUDIO_DIR / keyword
-        audio_files = list(audio_folder.glob("*.mp3"))
+def log_video(filename, audio_name):
+    doc = Document(LOG_FILE)
+    doc.add_paragraph(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Video: {filename} | Audio: {audio_name}")
+    doc.save(LOG_FILE)
 
-        if not audio_files:
-            print(f"⚠️ لا يوجد صوت مناسب لـ {keyword}")
+def process_videos():
+    used_audios = load_used_audios(LOG_FILE)
+    processed_count = 0
+
+    for keyword_folder in VIDEOS_DIR.iterdir():
+        if not keyword_folder.is_dir():
             continue
 
-        used_audio = audio_files.pop(0)
-        audio_clip = AudioFileClip(str(used_audio))
+        videos = list(keyword_folder.glob("*.mp4"))
+        random.shuffle(videos)
 
-        if audio_clip.duration > clip.duration:
-            audio_clip = audio_clip.subclip(0, clip.duration)
-        else:
-            loops = int(clip.duration // audio_clip.duration) + 1
-            audio_clip = concatenate_audioclips([audio_clip] * loops).subclip(0, clip.duration)
+        for video_path in videos:
+            if processed_count >= 2:
+                return
 
-        final = clip.set_audio(audio_clip)
-        final.write_videofile(str(output_path), codec="libx264", audio_codec="aac")
-        print(f"🎧 تم دمج صوت مع الفيديو {video_path.name}")
+            has_audio = is_video_with_audio(video_path)
 
-    # ✍️ تسجيل الفيديو في السجل
-    doc.add_paragraph(str(video_path))
-    print(f"📝 تم تسجيل الفيديو {video_path.name} في السجل.")
+            if has_audio:
+                shutil.copy(video_path, OUTPUT_DIR / video_path.name)
+                log_video(video_path.name, "original_audio")
+                processed_count += 1
+            else:
+                audio_folder = AUDIO_DIR / keyword_folder.name
+                selected_audio = select_unused_audio(audio_folder, used_audios)
 
-# 💾 حفظ ملف السجل
-doc.save(LOG_FILE)
-print("✅ تم حفظ السجل.")
+                if not selected_audio:
+                    print(f"❌ لا يوجد صوت متاح لـ {keyword_folder.name}")
+                    continue
 
-# 📤 (اختياري) نشر الفيديوهات باستخدام التوكن
-if access_token:
-    print("📤 يمكنك الآن استخدام التوكن للنشر على Instagram (لم يُنفّذ هنا).")
+                video = VideoFileClip(str(video_path))
+                audio = AudioFileClip(str(selected_audio))
+
+                # قص أو تكرار الصوت لمطابقة طول الفيديو
+                if audio.duration >= video.duration:
+                    audio = audio.subclip(0, video.duration)
+                else:
+                    loop_count = int(video.duration // audio.duration) + 1
+                    audio = CompositeAudioClip([audio] * loop_count).subclip(0, video.duration)
+
+                final_video = video.set_audio(audio)
+                output_path = OUTPUT_DIR / video_path.name
+                final_video.write_videofile(str(output_path), codec="libx264", audio_codec="aac", verbose=False, logger=None)
+
+                video.close()
+                audio.close()
+                final_video.close()
+
+                log_video(video_path.name, selected_audio.name)
+                processed_count += 1
+
+if __name__ == "__main__":
+    process_videos()
