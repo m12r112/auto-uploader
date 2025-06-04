@@ -1,33 +1,38 @@
-name: 🔁 Refresh Instagram Token
+name: ♻️ Refresh Instagram Token
 
 on:
   schedule:
-    - cron: '0 2 * * 0'  # كل أسبوع يوم الأحد الساعة 2 صباحًا (بتوقيت UTC)
-  workflow_dispatch:     # زر يدوي للتشغيل
+    - cron: '0 4 */55 * *'  # كل 55 يوم الساعة 4:00 صباحًا
+  workflow_dispatch:
 
 jobs:
   refresh-token:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ⬇️ Checkout repo
+    - name: 🧾 استنساخ المستودع
       uses: actions/checkout@v3
 
-    - name: 🐍 Set up Python
+    - name: 🐍 إعداد Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 📦 Install dependencies
+    - name: 📦 تثبيت المتطلبات
       run: pip install requests
 
-    - name: 🔑 Refresh Instagram Token
+    - name: 🔄 تحديث التوكن
       id: refresh
       env:
-        INSTAGRAM_OLD_TOKEN: ${{ secrets.INSTAGRAM_OLD_TOKEN }}
+        INSTAGRAM_REFRESH_TOKEN: ${{ secrets.INSTAGRAM_REFRESH_TOKEN }}
+        META_APP_ID: ${{ secrets.META_APP_ID }}
+        META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
       run: |
-        new_token=$(python refresh_token.py)
+        new_token=$(python refresh_token.py | tail -n 1)
         echo "token=$new_token" >> $GITHUB_OUTPUT
 
-    - name: ✅ Pass token to other workflows (اختياري)
-      run: echo "تم التحديث بنجاح، التوكن جاهز للاستخدام."
+    - name: ✅ استخدام التوكن الجديد في باقي السكربتات
+      env:
+        INSTAGRAM_ACCESS_TOKEN: ${{ steps.refresh.outputs.token }}
+      run: |
+        echo "🔐 سيتم تمرير التوكن إلى سكربتات النشر التالية تلقائيًا."
