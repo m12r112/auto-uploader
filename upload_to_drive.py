@@ -67,6 +67,7 @@ def upload_file(service, file_path, parent_folder_id):
     with open(LOG_FILE, "a") as log:
         log.write(f"{file_path.name}\n")
 
+    # ✅ هذا هو السطر المطلوب فقط!
     print(f"{public_url}|{file_id}")
     return public_url, file_id
 
@@ -76,8 +77,7 @@ def upload_all_videos(service):
 
     print("📂 Scanning for videos in:", OUTPUT_DIR)
     for video_file in OUTPUT_DIR.glob("*.mp4"):
-        url, fid = upload_file(service, video_file, reels_folder)
-        print(f"{url}|{fid}")
+        upload_file(service, video_file, reels_folder)
         break  # فقط أول فيديو
 
 def main():
