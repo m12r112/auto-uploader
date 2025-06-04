@@ -2,8 +2,8 @@ import requests
 import os
 
 # احصل على المتغيرات من بيئة GitHub
-APP_ID = os.getenv("APP_ID")
-APP_SECRET = os.getenv("APP_SECRET")
+APP_ID = os.getenv("FB_APP_ID")
+APP_SECRET = os.getenv("FB_APP_SECRET")
 CURRENT_LONG_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
 
 # رابط طلب التحديث
@@ -22,7 +22,6 @@ if response.ok:
     print("✅ تم تحديث التوكن بنجاح")
     print("🔐 التوكن الجديد:", new_token)
     
-    # حفظ التوكن الجديد في ملف لتتم قراءته لاحقًا من سكربتات النشر
     with open("latest_token.txt", "w") as f:
         f.write(new_token)
 else:
