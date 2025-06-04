@@ -5,7 +5,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# 📁 إعداد المسارات
 OUTPUT_DIR = Path("final_reels")
 LOG_FILE = Path("Published_Videos_Log.txt")
 
@@ -68,8 +67,8 @@ def upload_file(service, file_path, parent_folder_id):
     with open(LOG_FILE, "a") as log:
         log.write(f"{file_path.name}\n")
 
-    print(f"✅ Uploaded: {file_path.name} → {public_url}")
-    return public_url
+    print(f"{public_url}|{file_id}")
+    return public_url, file_id
 
 def upload_all_videos(service):
     auto_folder = get_or_create_folder(service, "AutoUploader")
@@ -77,10 +76,9 @@ def upload_all_videos(service):
 
     print("📂 Scanning for videos in:", OUTPUT_DIR)
     for video_file in OUTPUT_DIR.glob("*.mp4"):
-        print(f"🎬 Video ready: {video_file}")
-        public_url = upload_file(service, video_file, reels_folder)
-        print(f"🌐 Public URL: {public_url}")
-        # يمكن طباعة هذا في GitHub Actions كـ output
+        url, fid = upload_file(service, video_file, reels_folder)
+        print(f"{url}|{fid}")
+        break  # فقط أول فيديو
 
 def main():
     service = setup_drive()
