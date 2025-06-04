@@ -1,0 +1,44 @@
+name: 🚀 Publish Reels with Auto Token Refresh
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # يوميًا الساعة 5 صباحًا بتوقيت UTC
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ⬇️ استنساخ المستودع
+      uses: actions/checkout@v3
+
+    - name: 🐍 إعداد Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 تثبيت المتطلبات
+      run: |
+        pip install requests google-api-python-client google-auth pydub python-docx moviepy
+
+    - name: 🔄 تحديث التوكن
+      id: refresh
+      env:
+        INSTAGRAM_REFRESH_TOKEN: ${{ secrets.INSTAGRAM_OLD_TOKEN }}
+        META_APP_ID: ${{ secrets.FB_APP_ID }}
+        META_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+      run: |
+        new_token=$(python scripts/refresh_token.py | tail -n 1)
+        echo "token=$new_token" >> $GITHUB_OUTPUT
+
+    - name: 🚀 نشر الريلز على Instagram
+      env:
+        IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+        INSTAGRAM_ACCESS_TOKEN: ${{ steps.refresh.outputs.token }}
+        VIDEO_PUBLIC_URL: ${{ secrets.VIDEO_PUBLIC_URL }}
+        DRIVE_FILE_ID: ${{ secrets.DRIVE_FILE_ID }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: |
+        python scripts/publish_reels.py
