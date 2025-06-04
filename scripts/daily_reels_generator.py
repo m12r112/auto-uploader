@@ -1,7 +1,9 @@
 import os
 import random
 from pathlib import Path
-from moviepy.editor import VideoFileClip, AudioFileClip, CompositeAudioClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
+from moviepy.audio.io.AudioFileClip import AudioFileClip
+from moviepy.audio.AudioClip import CompositeAudioClip
 from docx import Document
 from datetime import datetime
 import shutil
