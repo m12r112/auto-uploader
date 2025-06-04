@@ -1,0 +1,46 @@
+name: 🤖 Auto Publish Reels Daily
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # يوميًا الساعة 5 صباحًا بتوقيت UTC
+  workflow_dispatch:
+
+jobs:
+  auto-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ⬇️ استنساخ المستودع
+      uses: actions/checkout@v3
+
+    - name: 🐍 إعداد Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 📦 تثبيت المتطلبات
+      run: |
+        pip install moviepy docx google-api-python-client google-auth pydub requests
+
+    - name: 🎬 توليد الفيديوهات النهائية
+      run: python scripts/daily_reels_generator.py
+
+    - name: ☁️ رفع الفيديو إلى Google Drive
+      id: upload
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: |
+        video_url=$(python scripts/upload_to_drive.py | grep VIDEO_PUBLIC_URL | cut -d '=' -f2- | xargs)
+        file_id=$(python scripts/upload_to_drive.py | grep DRIVE_FILE_ID | cut -d '=' -f2- | xargs)
+        echo "video_url=$video_url" >> $GITHUB_OUTPUT
+        echo "file_id=$file_id" >> $GITHUB_OUTPUT
+
+    - name: 🚀 نشر الفيديو على Instagram
+      env:
+        IG_USER_ID: ${{ secrets.IG_USER_ID }}
+        FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+        INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_OLD_TOKEN }}
+        VIDEO_PUBLIC_URL: ${{ steps.upload.outputs.video_url }}
+        DRIVE_FILE_ID: ${{ steps.upload.outputs.file_id }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: python scripts/publish_reels.py
