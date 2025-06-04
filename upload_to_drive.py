@@ -5,7 +5,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-OUTPUT_DIR = Path("videos")
+# المسار الصحيح للفيديوهات النهائية
+OUTPUT_DIR = Path("output_reels")
 LOG_FILE = Path("Published_Videos_Log.txt")
 
 def setup_drive():
@@ -55,22 +56,21 @@ def upload_file(service, file_path, parent_folder_id):
 
     print(f"✅ Uploaded: {file_path.name} → Drive ID: {uploaded['id']}")
 
-def upload_all_videos(service):
-    auto_folder = get_or_create_folder(service, "AutoUploader")
-    reels_folder = get_or_create_folder(service, "UploadedReels", parent_id=auto_folder)
+def upload_all_output_videos(service):
+    if not OUTPUT_DIR.exists():
+        print("❌ Folder 'output_reels/' not found.")
+        return
 
-    print("📂 Scanning for videos in:", OUTPUT_DIR)
-    for keyword_folder in OUTPUT_DIR.iterdir():
-        print(f"🔎 Found folder: {keyword_folder}")
-        if not keyword_folder.is_dir():
-            continue
-        for video_file in keyword_folder.glob("*.mp4"):
-            print(f"🎬 Video ready: {video_file}")
-            upload_file(service, video_file, reels_folder)
+    auto_folder = get_or_create_folder(service, "AutoUploader")
+    final_folder = get_or_create_folder(service, "final_reels", parent_id=auto_folder)
+
+    print("📂 Scanning for final videos in:", OUTPUT_DIR)
+    for video_file in OUTPUT_DIR.glob("*.mp4"):
+        upload_file(service, video_file, final_folder)
 
 def main():
     service = setup_drive()
-    upload_all_videos(service)
+    upload_all_output_videos(service)
 
 if __name__ == "__main__":
     main()
