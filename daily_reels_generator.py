@@ -1,65 +1,44 @@
-import os
-import random
-import shutil
 from pathlib import Path
-from moviepy.editor import VideoFileClip
-from docx import Document
+import os
+import json
+import requests
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from moviepy.editor import VideoFileClip, AudioFileClip
+import random
 
-VIDEOS_DIR = Path("videos")
-OUTPUT_DIR = Path("final_reels")
-LOG_FILE = Path("Published_Videos_Log.docx")
+# ✅ قراءة التوكن من الملف الذي يتم تحديثه تلقائيًا
+INSTAGRAM_ACCESS_TOKEN = Path("latest_token.txt").read_text().strip()
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# إعدادات المسارات
+with open("settings.json") as f:
+    settings = json.load(f)
 
-# 📄 تحميل سجل الفيديوهات
-if LOG_FILE.exists():
-    doc = Document(LOG_FILE)
-else:
-    doc = Document()
-    doc.add_heading("Published Videos Log", 0)
+FINAL_REELS_DIR = settings["final_reels_dir"]
+LOG_FILE = settings["published_log_file"]
 
-used_videos = set(p.text for p in doc.paragraphs[1:] if p.text)
+def read_uploaded_videos():
+    if not os.path.exists(LOG_FILE):
+        return []
+    with open(LOG_FILE, "r", encoding="utf-8") as f:
+        return f.read().splitlines()
 
-# 🔍 العثور على فيديوهات جديدة تحتوي على صوت فقط وتكون رأسية بدقة جيدة
-available_videos = []
-for subfolder in VIDEOS_DIR.glob("*/"):
-    for video_file in subfolder.glob("*.mp4"):
-        print(f"\n🔍 فحص: {video_file.name}")
+def upload_to_instagram(video_path):
+    print(f"⬆️ جاري رفع الفيديو: {video_path}")
+    print(f"🔐 باستخدام التوكن: {INSTAGRAM_ACCESS_TOKEN[:10]}...")
 
-        if video_file.name in used_videos:
-            print("⏭️ تم استخدامه من قبل")
-            continue
+    # يمكنك هنا كتابة كود رفع الفيديو إلى Instagram Graph API باستخدام requests
 
-        try:
-            clip = VideoFileClip(str(video_file))
-            w, h = clip.size
-            duration = clip.duration
-            audio = clip.audio
+def main():
+    uploaded = set(read_uploaded_videos())
 
-            if w >= h:
-                print("❌ مستبعد: الفيديو أفقي")
-                continue
-            if clip.audio is None:
-                print("❌ مستبعد: لا يحتوي على صوت")
-                continue
-            if h < 720:
-                print("❌ مستبعد: الجودة أقل من 720p")
-                continue
+    for file in os.listdir(FINAL_REELS_DIR):
+        if file.endswith(".mp4") and file not in uploaded:
+            full_path = os.path.join(FINAL_REELS_DIR, file)
+            upload_to_instagram(full_path)
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(file + "\n")
+            break
 
-            print("✅ مؤهل: سيتم إضافته")
-            available_videos.append(video_file)
-        except Exception as e:
-            print(f"⚠️ خطأ عند فحص {video_file.name}: {e}")
-
-# 🎯 اختيار 2 فيديو عشوائي فقط
-selected = random.sample(available_videos, k=min(2, len(available_videos)))
-
-for video_path in selected:
-    dest_path = OUTPUT_DIR / video_path.name
-    shutil.copy(video_path, dest_path)
-    print(f"📁 تم النسخ إلى final_reels/: {video_path.name}")
-    doc.add_paragraph(video_path.name)
-
-# 💾 حفظ السجل
-doc.save(LOG_FILE)
-print("📄 تم تحديث سجل الفيديوهات.")
+if __name__ == "__main__":
+    main()
