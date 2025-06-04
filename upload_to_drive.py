@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# ✅ التعديل هنا: تغيير المجلد إلى final_reels
+# 📁 إعداد المسارات
 OUTPUT_DIR = Path("final_reels")
 LOG_FILE = Path("Published_Videos_Log.txt")
 
@@ -13,7 +13,7 @@ def setup_drive():
     key_json = os.environ.get("SERVICE_ACCOUNT_KEY")
     if not key_json:
         raise Exception("❌ SERVICE_ACCOUNT_KEY not found in environment.")
-
+    
     key_data = json.loads(key_json)
     credentials = service_account.Credentials.from_service_account_info(
         key_data, scopes=["https://www.googleapis.com/auth/drive"]
@@ -39,6 +39,16 @@ def get_or_create_folder(service, folder_name, parent_id=None):
     folder = service.files().create(body=file_metadata, fields='id').execute()
     return folder.get('id')
 
+def make_file_public(service, file_id):
+    permission = {
+        'type': 'anyone',
+        'role': 'reader'
+    }
+    service.permissions().create(fileId=file_id, body=permission).execute()
+
+def get_public_url(file_id):
+    return f"https://drive.google.com/uc?id={file_id}&export=download"
+
 def upload_file(service, file_path, parent_folder_id):
     file_metadata = {
         'name': file_path.name,
@@ -51,10 +61,15 @@ def upload_file(service, file_path, parent_folder_id):
         fields='id'
     ).execute()
 
+    file_id = uploaded.get("id")
+    make_file_public(service, file_id)
+    public_url = get_public_url(file_id)
+
     with open(LOG_FILE, "a") as log:
         log.write(f"{file_path.name}\n")
 
-    print(f"✅ Uploaded: {file_path.name} → Drive ID: {uploaded['id']}")
+    print(f"✅ Uploaded: {file_path.name} → {public_url}")
+    return public_url
 
 def upload_all_videos(service):
     auto_folder = get_or_create_folder(service, "AutoUploader")
@@ -63,7 +78,9 @@ def upload_all_videos(service):
     print("📂 Scanning for videos in:", OUTPUT_DIR)
     for video_file in OUTPUT_DIR.glob("*.mp4"):
         print(f"🎬 Video ready: {video_file}")
-        upload_file(service, video_file, reels_folder)
+        public_url = upload_file(service, video_file, reels_folder)
+        print(f"🌐 Public URL: {public_url}")
+        # يمكن طباعة هذا في GitHub Actions كـ output
 
 def main():
     service = setup_drive()
