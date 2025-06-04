@@ -1,10 +1,11 @@
-import requests
+from pathlib import Path
 import os
+import requests
 
-# احصل على المتغيرات من بيئة GitHub
+# استيراد المتغيرات من بيئة GitHub Actions
 APP_ID = os.getenv("FB_APP_ID")
 APP_SECRET = os.getenv("FB_APP_SECRET")
-CURRENT_LONG_TOKEN = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+CURRENT_LONG_TOKEN = os.getenv("FB_ACCESS_TOKEN")
 
 # رابط طلب التحديث
 url = "https://graph.facebook.com/v23.0/oauth/access_token"
@@ -22,6 +23,7 @@ if response.ok:
     print("✅ تم تحديث التوكن بنجاح")
     print("🔐 التوكن الجديد:", new_token)
     
+    # حفظ التوكن الجديد في ملف
     with open("latest_token.txt", "w") as f:
         f.write(new_token)
 else:
