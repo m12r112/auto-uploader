@@ -1,30 +1,35 @@
-from pathlib import Path
 import os
 import requests
 
-# استيراد المتغيرات من بيئة GitHub Actions
-APP_ID = os.getenv("FB_APP_ID")
-APP_SECRET = os.getenv("FB_APP_SECRET")
-CURRENT_LONG_TOKEN = os.getenv("FB_ACCESS_TOKEN")
+# احصل على التوكن القديم من المتغير البيئي
+old_token = os.environ.get("INSTAGRAM_OLD_TOKEN")
 
-# رابط طلب التحديث
-url = "https://graph.facebook.com/v23.0/oauth/access_token"
+if not old_token:
+    print("❌ لم يتم العثور على التوكن القديم في المتغير البيئي 'INSTAGRAM_OLD_TOKEN'.")
+    exit(1)
+
+# رابط تحديث التوكن من Meta API
+url = "https://graph.instagram.com/refresh_access_token"
+
 params = {
-    "grant_type": "fb_exchange_token",
-    "client_id": APP_ID,
-    "client_secret": APP_SECRET,
-    "fb_exchange_token": CURRENT_LONG_TOKEN
+    "grant_type": "ig_refresh_token",
+    "access_token": old_token
 }
 
-response = requests.get(url, params=params)
-
-if response.ok:
-    new_token = response.json().get("access_token")
-    print("✅ تم تحديث التوكن بنجاح")
-    print("🔐 التوكن الجديد:", new_token)
+try:
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    data = response.json()
     
-    # حفظ التوكن الجديد في ملف
-    with open("latest_token.txt", "w") as f:
-        f.write(new_token)
-else:
-    print("❌ فشل تحديث التوكن:", response.text)
+    new_token = data.get("access_token")
+    expires_in = data.get("expires_in")
+
+    if new_token:
+        print(f"{new_token}")  # ✅ يتم طباعته ليتم تمريره في GitHub Actions
+    else:
+        print("❌ لم يتم العثور على توكن جديد في الاستجابة.")
+        exit(1)
+
+except requests.exceptions.RequestException as e:
+    print(f"❌ فشل الاتصال: {e}")
+    exit(1)
