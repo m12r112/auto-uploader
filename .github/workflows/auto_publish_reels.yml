@@ -20,7 +20,7 @@ jobs:
 
     - name: 📦 تثبيت المتطلبات
       run: |
-        pip install moviepy docx google-api-python-client google-auth pydub requests
+        pip install moviepy python-docx google-api-python-client google-auth pydub requests
 
     - name: 🎬 توليد الفيديوهات النهائية
       run: python scripts/daily_reels_generator.py
