@@ -1,44 +1,63 @@
-name: Generate and Upload Reels
+name: Generate Daily Reels
 
 on:
   schedule:
-    - cron: '0 3 * * *'  # ⏰ يوميًا الساعة 6 صباحًا بتوقيت بغداد (UTC+3)
-  workflow_dispatch:     # ⚡ للتشغيل اليدوي عند الحاجة
+    - cron: '0 5 * * *'  # كل يوم الساعة 5 صباحًا بتوقيت بغداد
+  workflow_dispatch:
 
 jobs:
-  generate-reels:
+  generate:
     runs-on: ubuntu-latest
-    env:
-      SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-
     steps:
-      - name: ⬇️ Clone repository
+      - name: Checkout Repo
         uses: actions/checkout@v3
 
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: 📦 Install dependencies
+      - name: Install Dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: 🔑 Write service account key
-        run: echo "$SERVICE_ACCOUNT_KEY" > service_account.key
+      - name: Fetch Pexels Videos
+        run: |
+          python scripts/daily_fetch_and_upload.py
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
-      - name: 📥 Download videos from Google Drive
-        run: python download_videos_from_drive.py
+      - name: Generate Reels
+        run: |
+          python scripts/daily_reels_generator.py
 
-      - name: 🔊 Download audio library from Google Drive
-        run: python download_audio_from_drive.py
+      - name: Generate Captions
+        run: |
+          python scripts/generate_caption.py
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: 🎬 Run daily reels generator
-        run: python daily_reels_generator.py
+      - name: Upload to Drive
+        run: |
+          python scripts/upload_to_drive.py
+        env:
+          SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
-      - name: 📝 Generate captions using GPT4Free
-        run: python generate_caption.py
+      - name: Send Weekly Report
+        if: github.event.schedule == '0 5 * * 7'
+        run: |
+          python scripts/send_weekly_report.py
+        env:
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: mm2677078@gmail.com
 
-      - name: ☁️ Upload final reels to Google Drive
-        run: python upload_to_drive.py
+      - name: Auto Refresh Instagram Token
+        run: |
+          python scripts/refresh_token.py
+        env:
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
