@@ -1,35 +1,31 @@
 import os
 import requests
 
-# احصل على التوكن القديم من المتغير البيئي
-old_token = os.environ.get("INSTAGRAM_OLD_TOKEN")
+print("🔄 بدء تحديث التوكن...")
 
-if not old_token:
-    print("❌ لم يتم العثور على التوكن القديم في المتغير البيئي 'INSTAGRAM_OLD_TOKEN'.")
+refresh_token = os.environ.get("INSTAGRAM_REFRESH_TOKEN")
+app_id = os.environ.get("META_APP_ID")
+app_secret = os.environ.get("META_APP_SECRET")
+
+if not refresh_token or not app_id or not app_secret:
+    print("❌ تأكد من وجود المتغيرات البيئية: INSTAGRAM_REFRESH_TOKEN و META_APP_ID و META_APP_SECRET.")
     exit(1)
 
-# رابط تحديث التوكن من Meta API
-url = "https://graph.instagram.com/refresh_access_token"
-
+url = f"https://graph.facebook.com/v19.0/oauth/access_token"
 params = {
-    "grant_type": "ig_refresh_token",
-    "access_token": old_token
+    "grant_type": "fb_exchange_token",
+    "client_id": app_id,
+    "client_secret": app_secret,
+    "fb_exchange_token": refresh_token
 }
 
-try:
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
-    
-    new_token = data.get("access_token")
-    expires_in = data.get("expires_in")
+res = requests.get(url, params=params)
+data = res.json()
 
-    if new_token:
-        print(f"{new_token}")  # ✅ يتم طباعته ليتم تمريره في GitHub Actions
-    else:
-        print("❌ لم يتم العثور على توكن جديد في الاستجابة.")
-        exit(1)
-
-except requests.exceptions.RequestException as e:
-    print(f"❌ فشل الاتصال: {e}")
+if "access_token" in data:
+    print("✅ تم الحصول على التوكن الجديد:")
+    print(data["access_token"])  # يتم تمريره لـ GitHub Actions
+else:
+    print("❌ فشل التحديث:")
+    print(data)
     exit(1)
