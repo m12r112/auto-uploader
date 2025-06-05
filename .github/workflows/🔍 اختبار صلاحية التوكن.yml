@@ -1,0 +1,3 @@
+ run: python scripts/test_token.py
+  env:
+    INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
