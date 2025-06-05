@@ -22,6 +22,11 @@ jobs:
       run: |
         pip install moviepy python-docx google-api-python-client google-auth pydub requests
 
+    - name: 📥 تحميل الفيديوهات من Google Drive
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: python scripts/download_videos_from_drive.py
+
     - name: 🎬 توليد الفيديوهات النهائية
       run: python scripts/daily_reels_generator.py
 
