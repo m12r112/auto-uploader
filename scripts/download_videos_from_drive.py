@@ -5,7 +5,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# 🔐 تحميل مفتاح الخدمة من المتغير البيئي
+# إعداد المفتاح
 key_json = os.environ["SERVICE_ACCOUNT_KEY"]
 with open("service_account.key", "w") as f:
     f.write(key_json)
@@ -16,42 +16,26 @@ credentials = service_account.Credentials.from_service_account_file(
 )
 drive_service = build("drive", "v3", credentials=credentials)
 
-# 🧭 دالة للبحث عن مجلد وفق المسار الكامل
-def find_folder_path(path_list):
-    parent_id = "root"
-    for name in path_list:
-        query = f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' and '{parent_id}' in parents"
-        res = drive_service.files().list(q=query, fields="files(id, name)").execute()
-        folders = res.get("files", [])
-        if not folders:
-            print(f"❌ لم يتم العثور على المجلد: {name}")
-            return None
-        parent_id = folders[0]["id"]
-    return parent_id
+# ✅ نستخدم ID مجلد Videos مباشرة
+videos_folder_id = "1d2MrcTUp0RmRPO7fU3V85NrrOXGJq04U"
 
-# 🔍 تحديد مجلد AutoUploader/Videos
-videos_folder_id = find_folder_path(["AutoUploader", "Videos"])
-
-if not videos_folder_id:
-    print("❌ لم يتم العثور على المسار AutoUploader/Videos")
-    exit(1)
-
-# 📂 الحصول على كل المجلدات الفرعية (أنواع الفيديو)
+# جلب كل المجلدات الفرعية داخل Videos
 subfolders = drive_service.files().list(
     q=f"'{videos_folder_id}' in parents and mimeType='application/vnd.google-apps.folder'",
     fields="files(id, name)"
 ).execute().get("files", [])
 
+print(f"📂 تم العثور على {len(subfolders)} مجلدات فرعية داخل Videos.")
+
 for folder in subfolders:
     folder_name = folder["name"]
     folder_id = folder["id"]
-    print(f"📂 يعالج النوع: {folder_name}")
+    print(f"🔍 يعالج المجلد: {folder_name}")
 
-    # إنشاء المجلد المحلي
     local_folder = Path("videos") / folder_name
     local_folder.mkdir(parents=True, exist_ok=True)
 
-    # 🧲 تحميل كل ملفات الفيديو داخل المجلد الفرعي
+    # تحميل الفيديوهات
     videos = drive_service.files().list(
         q=f"'{folder_id}' in parents and mimeType contains 'video'",
         fields="files(id, name)"
