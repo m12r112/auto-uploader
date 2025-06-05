@@ -1,3 +1,7 @@
+name: 🔍 اختبار صلاحية التوكن
+
+on:
+  workflow_dispatch:  # هذا السطر ضروري لتفعيل زر التشغيل اليدوي
  run: python scripts/test_token.py
   env:
     INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
