@@ -22,6 +22,12 @@ jobs:
       run: |
         pip install moviepy python-docx google-api-python-client google-auth pydub requests
 
+    - name: 🧭 طباعة المجلدات داخل AutoUploader
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: |
+        python scripts/list_autouploader_folders.py
+
     - name: 📥 تحميل الفيديوهات من Google Drive
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
