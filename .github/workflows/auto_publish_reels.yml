@@ -2,7 +2,7 @@ name: 🤖 Auto Publish Reels Daily
 
 on:
   schedule:
-    - cron: '0 5 * * *'  # يوميًا الساعة 5 صباحًا بتوقيت UTC
+    - cron: '0 5 * * *'  # يوميًا الساعة 5:00 صباحًا بتوقيت UTC (8:00 صباحًا بغداد)
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ⬇️ استنساخ المستودع
+    - name: 📥 استنساخ المشروع
       uses: actions/checkout@v3
 
     - name: 🐍 إعداد Python
@@ -19,24 +19,30 @@ jobs:
         python-version: '3.10'
 
     - name: 📦 تثبيت المتطلبات
-      run: |
-        pip install moviepy python-docx google-api-python-client google-auth pydub requests
+      run: pip install requests python-docx google-api-python-client google-auth pydub moviepy
 
-    - name: 🧭 طباعة المجلدات داخل AutoUploader
+    - name: 🔄 تحديث التوكن من Meta
+      id: refresh_token
       env:
-        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        META_APP_ID: ${{ secrets.META_APP_ID }}
+        META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+        INSTAGRAM_REFRESH_TOKEN: ${{ secrets.INSTAGRAM_REFRESH_TOKEN }}
       run: |
-        python scripts/list_autouploader_folders.py
+        token=$(python scripts/refresh_token.py | grep NEW_INSTAGRAM_ACCESS_TOKEN | cut -d '=' -f2-)
+        echo "token=$token" >> $GITHUB_OUTPUT
 
-    - name: 📥 تحميل الفيديوهات من Google Drive
+    - name: 🧪 تمرير التوكن المحدث
+      run: echo "INSTAGRAM_ACCESS_TOKEN=${{ steps.refresh_token.outputs.token }}" >> $GITHUB_ENV
+
+    - name: ☁️ تحميل الفيديوهات من Google Drive
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: python scripts/download_videos_from_drive.py
 
-    - name: 🎬 توليد الفيديوهات النهائية
+    - name: 🎬 توليد فيديوهات الريلز
       run: python scripts/daily_reels_generator.py
 
-    - name: ☁️ رفع الفيديو إلى Google Drive
+    - name: ☁️ رفع الفيديو النهائي إلى Google Drive
       id: upload
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
@@ -46,12 +52,11 @@ jobs:
         echo "video_url=$video_url" >> $GITHUB_OUTPUT
         echo "file_id=$file_id" >> $GITHUB_OUTPUT
 
-    - name: 🚀 نشر الفيديو على Instagram
+    - name: 📲 نشر الفيديو على Instagram
       env:
         IG_USER_ID: ${{ secrets.IG_USER_ID }}
         FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
-        INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_OLD_TOKEN }}
+        INSTAGRAM_ACCESS_TOKEN: ${{ env.INSTAGRAM_ACCESS_TOKEN }}
         VIDEO_PUBLIC_URL: ${{ steps.upload.outputs.video_url }}
         DRIVE_FILE_ID: ${{ steps.upload.outputs.file_id }}
-        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: python scripts/publish_reels.py
