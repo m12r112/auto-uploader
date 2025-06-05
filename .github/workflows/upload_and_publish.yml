@@ -1,51 +1,52 @@
-name: 🚀 Upload & Publish Instagram Reel
+name: 🚀 Upload & Publish Reels
 
 on:
-  schedule:
-    - cron: '30 12 * * *'  # 3:30 مساءً بتوقيت بغداد
   workflow_dispatch:
 
 jobs:
-  upload-and-publish:
+  upload_and_publish:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🧾 Checkout Repository
+    - name: 📥 استنساخ المستودع
       uses: actions/checkout@v3
 
-    - name: 🛑 Check if there are videos
-      run: |
-        if ! ls final_reels/*.mp4 1> /dev/null 2>&1; then
-          echo "❌ لا يوجد فيديو للنشر."
-          exit 0
-        fi
-
-    - name: 🐍 Setup Python
+    - name: 🐍 إعداد Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
 
-    - name: 📦 Install dependencies
-      run: pip install google-api-python-client google-auth google-auth-oauthlib python-docx moviepy
+    - name: 🧰 تثبيت المتطلبات
+      run: pip install requests python-docx google-api-python-client google-auth pydub moviepy
 
-    - name: 🔼 Upload Video to Google Drive
+    - name: 🔄 تحديث التوكن من Meta
+      id: refresh_token
+      env:
+        META_APP_ID: ${{ secrets.META_APP_ID }}
+        META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+        INSTAGRAM_REFRESH_TOKEN: ${{ secrets.INSTAGRAM_REFRESH_TOKEN }}
+      run: |
+        token=$(python scripts/refresh_token.py | grep NEW_INSTAGRAM_ACCESS_TOKEN | cut -d '=' -f2-)
+        echo "token=$token" >> $GITHUB_OUTPUT
+
+    - name: 🧪 تمرير التوكن المحدث
+      run: echo "INSTAGRAM_ACCESS_TOKEN=${{ steps.refresh_token.outputs.token }}" >> $GITHUB_ENV
+
+    - name: ☁️ رفع الفيديو إلى Google Drive
       id: upload
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: |
-        result=$(python upload_to_drive.py | grep "https://drive.google.com/uc?id=" | tail -n1)
-        video_url=$(echo $result | cut -d "|" -f1)
-        file_id=$(echo $result | cut -d "|" -f2)
+        video_url=$(python scripts/upload_to_drive.py | grep VIDEO_PUBLIC_URL | cut -d '=' -f2- | xargs)
+        file_id=$(python scripts/upload_to_drive.py | grep DRIVE_FILE_ID | cut -d '=' -f2- | xargs)
         echo "video_url=$video_url" >> $GITHUB_OUTPUT
         echo "file_id=$file_id" >> $GITHUB_OUTPUT
 
-    - name: 📤 Publish Reel to Instagram
+    - name: 📲 نشر الفيديو على Instagram
       env:
-        INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
         IG_USER_ID: ${{ secrets.IG_USER_ID }}
         FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+        INSTAGRAM_ACCESS_TOKEN: ${{ env.INSTAGRAM_ACCESS_TOKEN }}
         VIDEO_PUBLIC_URL: ${{ steps.upload.outputs.video_url }}
         DRIVE_FILE_ID: ${{ steps.upload.outputs.file_id }}
-        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      run: |
-        python publish_reels.py
+      run: python scripts/publish_reels.py
