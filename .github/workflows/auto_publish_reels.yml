@@ -19,16 +19,16 @@ jobs:
       - name: 📦 Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 🔍 اختبار صلاحية التوكن (اختياري)
+      - name: 🔍 اختبار صلاحية التوكن
         run: python scripts/test_token.py
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
 
-      - name: 🚀 نشر الريلز على Instagram
+      - name: 🚀 نشر الريلز على Instagram (باستخدام فيديو تجريبي)
         run: python scripts/publish_reels.py
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
-          VIDEO_PUBLIC_URL: ${{ secrets.VIDEO_PUBLIC_URL }}
-          DRIVE_FILE_ID: ${{ secrets.DRIVE_FILE_ID }}
+          VIDEO_PUBLIC_URL: https://filesamples.com/samples/video/mp4/sample_640x360.mp4
+          DRIVE_FILE_ID: test_video
