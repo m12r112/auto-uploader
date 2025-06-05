@@ -1,35 +1,22 @@
 import os
 import requests
 
-print("🔄 بدء تحديث التوكن...")
+APP_ID = os.environ["META_APP_ID"]
+APP_SECRET = os.environ["META_APP_SECRET"]
+REFRESH_TOKEN = os.environ["INSTAGRAM_REFRESH_TOKEN"]
 
-# جلب المتغيرات البيئية
-refresh_token = os.environ.get("INSTAGRAM_REFRESH_TOKEN")
-app_id = os.environ.get("META_APP_ID")
-app_secret = os.environ.get("META_APP_SECRET")
+url = (
+    f"https://graph.instagram.com/refresh_access_token"
+    f"?grant_type=ig_refresh_token"
+    f"&access_token={REFRESH_TOKEN}"
+)
 
-# التحقق من القيم
-if not refresh_token or not app_id or not app_secret:
-    print("❌ تأكد من وجود المتغيرات: INSTAGRAM_REFRESH_TOKEN, META_APP_ID, META_APP_SECRET")
-    exit(1)
+response = requests.get(url)
+data = response.json()
 
-# إرسال طلب لتحديث التوكن
-url = "https://graph.facebook.com/v19.0/oauth/access_token"
-params = {
-    "grant_type": "fb_exchange_token",
-    "client_id": app_id,
-    "client_secret": app_secret,
-    "fb_exchange_token": refresh_token
-}
-
-res = requests.get(url, params=params)
-data = res.json()
-
-# عرض النتيجة
 if "access_token" in data:
-    print("✅ تم تحديث التوكن بنجاح:")
-    print(data["access_token"])  # يتم قراءته بواسطة GitHub Actions
+    new_token = data["access_token"]
+    print("✅ NEW_INSTAGRAM_ACCESS_TOKEN=" + new_token)
 else:
-    print("❌ فشل تحديث التوكن:")
-    print(data)
+    print("❌ فشل التحديث:", data)
     exit(1)
